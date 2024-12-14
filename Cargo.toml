@@ -1,0 +1,49 @@
+[workspace]
+resolver = "2"
+members = ["app", "frontend", "server"]
+
+# need to be applied only to wasm build
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 'z'
+
+[workspace.dependencies]
+leptos = { version = "0.6" }
+leptos_meta = { version = "0.6" }
+leptos_router = { version = "0.6" }
+leptos_axum = { version = "0.6" }
+
+axum = "0.7"
+cfg-if = "1"
+console_error_panic_hook = "0.1.7"
+console_log = "1"
+http = "1"
+log = "0.4.20"
+simple_logger = "4.2.0"
+thiserror = "1"
+tokio = { version = "1.33.0", features = ["full"] }
+tower = { version = "0.4.13", features = ["full"] }
+tower-http = { version = "0.5", features = ["full"] }
+wasm-bindgen = "=0.2.99"
+
+[[workspace.metadata.leptos]]
+name = "karna"
+tailwind-input-file = "style/input.css"
+tailwind-config-file = "tailwind.config.js"
+bin-package = "server"
+lib-package = "frontend"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+assets-dir = "public"
+site-addr = "127.0.0.1:1420"
+reload-port = 3001
+end2end-cmd = "bunx playwright test"
+end2end-dir = "end2end"
+browserquery = "defaults"
+watch = false
+env = "DEV"
+bin-features = []
+bin-default-features = false
+lib-features = []
+lib-default-features = false

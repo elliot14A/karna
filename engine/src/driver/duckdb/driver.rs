@@ -8,7 +8,7 @@ use snafu::ResultExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::driver::Driver;
+use crate::driver::OlapDriver;
 
 /// DuckDBDriver implements the Driver trait for DuckDB database operations
 /// providing a thread-safe interface to execute SQL queries and commands
@@ -34,7 +34,7 @@ impl DuckDBDriver {
 }
 
 #[async_trait]
-impl Driver for DuckDBDriver {
+impl OlapDriver for DuckDBDriver {
     /// Implementation of Driver::new for DuckDBDriver
     fn new(dsn: String) -> Result<Self> {
         Self::new(dsn)

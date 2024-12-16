@@ -2,6 +2,28 @@ use crate::error::Result;
 use base64::prelude::*;
 use serde_json::json;
 
+/// Converts a DuckDB value into a serializable JSON value
+///
+/// This function handles the conversion of all DuckDB data types into their JSON representations:
+/// - Null values are converted to JSON null
+/// - Numeric types (integers, floats) are converted to JSON numbers
+/// - Strings and text are converted directly to JSON strings
+/// - Blobs are base64 encoded and converted to strings
+/// - Timestamps, dates, times are converted to their string representations
+/// - Intervals are converted to JSON objects with months, days, and nanos fields
+/// - Lists and arrays are converted to JSON arrays
+/// - Structs and maps are converted to JSON objects
+/// - Enums are converted to their string representations
+/// - Unions are unwrapped and converted based on their inner type
+///
+/// # Arguments
+///
+/// * `value` - A DuckDB value to convert
+///
+/// # Returns
+///
+/// * `Result<serde_json::Value>` - The JSON representation of the DuckDB value
+///                                 or an error if the conversion fails
 pub fn duckdb_value_to_json(value: duckdb::types::Value) -> Result<serde_json::Value> {
     let value = match value {
         duckdb::types::Value::Null => serde_json::Value::Null,
@@ -69,7 +91,6 @@ pub fn duckdb_value_to_json(value: duckdb::types::Value) -> Result<serde_json::V
             json!(json_array)
         }
         duckdb::types::Value::Map(ordered_map) => {
-            // Convert map to JSON object
             let mut map = serde_json::Map::new();
             for (key, value) in ordered_map.iter() {
                 let key_str = match duckdb_value_to_json(key.to_owned())? {

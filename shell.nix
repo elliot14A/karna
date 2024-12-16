@@ -19,6 +19,7 @@ pkgs.mkShell {
     cargo-generate
   ];
 
+
   shellHook = ''
     export RUST_BACKTRACE=1
     export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"

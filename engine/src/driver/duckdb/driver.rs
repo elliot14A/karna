@@ -1,19 +1,22 @@
 use crate::error::*;
-use duckdb::{Connection, Transaction};
+use async_trait::async_trait;
+use duckdb::Connection;
+use serde_json::Value;
 use snafu::ResultExt;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::{Mutex, MutexGuard};
 use tokio::fs;
-use tokio::sync::Mutex;
 
-// use crate::driver::OlapDriver;
+use crate::driver::OlapDriver;
 
 use super::config::Config;
-use super::utils::duckdb_row_to_json;
+use super::utils::{duckdb_row_to_json, sanitize_to_sql_name};
 
 /// DuckDBDriver implements the Driver trait for DuckDB database operations
 /// providing a thread-safe interface to execute SQL queries and commands
-/// TODO: maybe implement bb8::ManageConnection for connection pooling
-/// Have separate connections for read and write operations
+// TODO: maybe implement bb8::ManageConnection for connection pooling, does it even work with DuckDB?
+// Have separate connections for read and write operations
 pub struct DuckDBDriver {
     /// Thread-safe connection to DuckDB
     conn: Arc<Mutex<Connection>>,
@@ -21,7 +24,7 @@ pub struct DuckDBDriver {
 }
 
 impl DuckDBDriver {
-    async fn run_boot_queries(&self) -> Result<()> {
+    fn run_boot_queries(&self) -> Result<()> {
         let mut boot_queries = vec![
             "install 'json'",
             "load 'json'",
@@ -37,7 +40,7 @@ impl DuckDBDriver {
 
         boot_queries.extend(self.config.boot_queries().iter().map(String::as_str));
 
-        let conn = self.conn.lock().await;
+        let conn = self.conn.lock().unwrap();
 
         for query in boot_queries {
             conn.execute(query, [])
@@ -67,14 +70,14 @@ impl DuckDBDriver {
         Ok(())
     }
 
-    pub async fn new(config: Config) -> Result<Self> {
+    pub fn new(config: Config) -> Result<Self> {
         let dsn = config.build_dsn();
         let conn = Connection::open(dsn).context(ConnectionSnafu)?;
         let driver = DuckDBDriver {
             conn: Arc::new(Mutex::new(conn)),
             config,
         };
-        driver.run_boot_queries().await?;
+        driver.run_boot_queries()?;
         Ok(driver)
     }
 
@@ -86,13 +89,11 @@ impl DuckDBDriver {
             .await
             .context(FileSystemSnafu { path: name.clone() })?;
 
-        let mut conn = self.conn.lock().await;
-
-        let transaction = conn.transaction().context(TransactionSnafu)?;
+        let conn = self.conn.lock().unwrap();
 
         // attach the new duckdb file to main.db
         let sql = format!("attach {} as {}", format!("'./{}.db'", name), name);
-        let mut stmt = transaction.prepare(&sql).context(PrepareStatementSnafu)?;
+        let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
         stmt.execute([]).context(ExecutionSnafu { sql })?;
 
         // load file in to the new db file
@@ -100,24 +101,53 @@ impl DuckDBDriver {
             "create or replace table {}.default as ({}\n)",
             name, create_sql
         );
-        let mut stmt = transaction.prepare(&sql).context(PrepareStatementSnafu)?;
-        stmt.execute([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
 
-        transaction.commit().context(TransactionSnafu)?;
+        stmt.execute([]).context(ExecutionSnafu { sql })?;
 
         // create new transaction to create view
-        let transaction = conn.transaction().context(TransactionSnafu)?;
-        let sql = Self::generate_select_query(&transaction, name.to_string()).await?;
+        let sql = Self::generate_select_query(&conn, name.to_string())?;
         let sql = format!("create or replace view {} as {}", name, sql);
-        let mut stmt = transaction.prepare(&sql).context(PrepareStatementSnafu)?;
+        let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
         stmt.execute([]).context(ExecutionSnafu { sql })?;
-        transaction.commit().context(TransactionSnafu)?;
 
         Ok(())
     }
 
-    async fn generate_select_query(
-        transaction: &Transaction<'_>,
+    pub fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(sql).context(PrepareStatementSnafu)?;
+        let mut rows = stmt.query([]).context(ExecutionSnafu { sql })?;
+
+        let mut rows_data = Vec::new();
+        while let Some(row) = rows.next().context(NextRowSnafu)? {
+            let values = duckdb_row_to_json(&row)?;
+            rows_data.push(values);
+        }
+
+        let schema = stmt.schema();
+        let column_names: Vec<String> = schema
+            .fields()
+            .iter()
+            .map(|field| field.name().to_string())
+            .collect();
+
+        let result = rows_data
+            .into_iter()
+            .map(|values| {
+                column_names
+                    .iter()
+                    .zip(values.into_iter())
+                    .map(|(name, value)| (name.clone(), value))
+                    .collect()
+            })
+            .collect();
+
+        Ok(result)
+    }
+
+    fn generate_select_query(
+        transaction: &MutexGuard<'_, Connection>,
         table_name: String,
     ) -> Result<String> {
         let sql = format!(
@@ -145,43 +175,20 @@ impl DuckDBDriver {
     }
 }
 
-fn sanitize_to_sql_name(filename: &str) -> String {
-    const MAX_LENGTH: usize = 63; // Common SQL identifier length limit
+#[async_trait]
+impl OlapDriver for DuckDBDriver {
+    /// Creates a new driver instance from a data source string
+    fn new(config: Config) -> Result<Self> {
+        DuckDBDriver::new(config)
+    }
 
-    // Sanitize the filename:
-    // 1. Replace non-alphanumeric chars with underscore
-    // 2. Remove consecutive underscores
-    // 3. Remove leading/trailing underscores
-    let sanitized: String = filename
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect::<String>()
-        .split('_')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("_");
+    async fn create_table(&self, table_name: &str, sql: &str) -> Result<()> {
+        self.create_table(table_name, sql).await
+    }
 
-    // If the sanitized string starts with a number, prepend 'n'
-    let valid_start = if sanitized
-        .chars()
-        .next()
-        .map(|c| c.is_ascii_digit())
-        .unwrap_or(false)
-    {
-        format!("n{}", sanitized)
-    } else {
-        sanitized
-    };
-
-    // Truncate if necessary, ensuring we don't cut in the middle of an underscore
-    if valid_start.len() > MAX_LENGTH {
-        let truncated = &valid_start[..MAX_LENGTH];
-        match truncated.rfind('_') {
-            Some(pos) if pos > 0 => valid_start[..pos].to_string(),
-            _ => truncated.to_string(),
-        }
-    } else {
-        valid_start
+    /// Executes a SQL query and returns the results as JSON
+    async fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
+        self.query(sql)
     }
 }
 
@@ -218,7 +225,7 @@ mod tests {
         let db = "test1.db".to_string();
         clean_up(db.clone()).await.unwrap();
         let config = create_test_config(db.clone());
-        let result = DuckDBDriver::new(config).await;
+        let result = DuckDBDriver::new(config);
         assert!(result.is_ok());
         clean_up(db).await.unwrap();
     }
@@ -229,8 +236,8 @@ mod tests {
         let db = "test2.db".to_string();
         clean_up(db.clone()).await.unwrap();
         let config = create_test_config(db.clone());
-        let driver = DuckDBDriver::new(config).await.unwrap();
-        let conn = driver.conn.lock().await;
+        let driver = DuckDBDriver::new(config).unwrap();
+        let conn = driver.conn.lock().unwrap();
 
         // Test JSON extension
         let result = conn.execute("SELECT json_structure('[1,2,3]')", []);
@@ -251,26 +258,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_table() {
+    async fn test_create_table_and_query() {
         let db = "test3.db".to_string();
         clean_up("test_table.db".to_string()).await.unwrap();
         clean_up(db.clone()).await.unwrap();
         let config = create_test_config(db.clone());
-        let driver = DuckDBDriver::new(config).await.unwrap();
+        let driver = DuckDBDriver::new(config).unwrap();
 
         // Test simple table creation
         let test_sql = "select * from read_csv('../test-data/deliveries.csv')";
         let result = driver.create_table("test_table", test_sql).await;
         assert!(result.is_ok());
 
-        // Verify table creation and data
-        let conn = driver.conn.lock().await;
-        let mut stmt = conn
-            .prepare("SELECT * FROM test_table.default LIMIT 1")
-            .unwrap();
-        let mut rows = stmt.query([]).unwrap();
-        let res = rows.next().unwrap();
-        assert!(res.is_some());
+        let result = driver.query("select * from test_table limit 1");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 1);
         clean_up(db).await.unwrap();
         clean_up("test_table.db".to_string()).await.unwrap();
     }

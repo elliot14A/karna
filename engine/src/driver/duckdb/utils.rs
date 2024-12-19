@@ -172,3 +172,43 @@ pub fn duckdb_row_to_json(row: &duckdb::Row) -> Result<Vec<JsonValue>> {
 
     Ok(vec)
 }
+
+pub fn sanitize_to_sql_name(filename: &str) -> String {
+    const MAX_LENGTH: usize = 63; // Common SQL identifier length limit
+
+    // Sanitize the filename:
+    // 1. Replace non-alphanumeric chars with underscore
+    // 2. Remove consecutive underscores
+    // 3. Remove leading/trailing underscores
+    let sanitized: String = filename
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect::<String>()
+        .split('_')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+
+    // If the sanitized string starts with a number, prepend 'n'
+    let valid_start = if sanitized
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_digit())
+        .unwrap_or(false)
+    {
+        format!("n{}", sanitized)
+    } else {
+        sanitized
+    };
+
+    // Truncate if necessary, ensuring we don't cut in the middle of an underscore
+    if valid_start.len() > MAX_LENGTH {
+        let truncated = &valid_start[..MAX_LENGTH];
+        match truncated.rfind('_') {
+            Some(pos) if pos > 0 => valid_start[..pos].to_string(),
+            _ => truncated.to_string(),
+        }
+    } else {
+        valid_start
+    }
+}

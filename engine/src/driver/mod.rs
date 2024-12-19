@@ -1,23 +1,20 @@
 pub mod duckdb;
 
+use std::collections::HashMap;
+
 use crate::error::Result;
 use async_trait::async_trait;
 use duckdb::config::Config;
+use serde_json::Value;
 
 /// Trait for OLAP database drivers that support async operations
 #[async_trait]
 pub trait OlapDriver: Send + 'static {
-    /// Creates a new driver instance from a data source string
-    fn new(dsn: String, config: Config) -> Result<Self>
+    fn new(config: Config) -> Result<Self>
     where
         Self: Sized;
 
-    /// Executes a single SQL statement with no return value
-    async fn execute(&self, sql: &str) -> Result<()>;
+    async fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>>;
 
-    /// Executes multiple SQL statements with no return value
-    async fn execute_batch(&self, sql: &str) -> Result<()>;
-
-    /// Executes a SQL query and returns the results as JSON
-    async fn query(&self, sql: &str) -> Result<serde_json::Value>;
+    async fn create_table(&self, table_name: &str, sql: &str) -> Result<()>;
 }

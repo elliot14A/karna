@@ -5,23 +5,32 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    /// Error that occurs when failing to establish a connection to DuckDB
-    #[snafu(display("Failed to connect to duckdb connection: {}", source,))]
-    ConnectionError { source: DBError },
+    #[snafu(display("Failed to connect to database: {source}"))]
+    Connection { source: DBError },
 
-    /// Error that occurs when failing to close a DuckDB connection after multiple attempts
-    #[snafu(display(
-        "Failed to close duckdb connection after {retries} retries: {}",
-        source,
-    ))]
-    ClosureError {
-        source: DBError, // The underlying DuckDB error
-        retries: u8,     // Number of retry attempts made
+    #[snafu(display("Failed to prepare statement: {source}"))]
+    PrepareStatement { source: DBError },
+
+    #[snafu(display("Failed to convert DuckDB value: {message}"))]
+    DuckDBValueConversion { message: String },
+
+    #[snafu(display("Failed to execute query '{sql}': {source}"))]
+    Execution { source: DBError, sql: String },
+
+    #[snafu(display("Transaction error: {source}"))]
+    Transaction { source: DBError },
+
+    #[snafu(display("File system error at '{path}': {source}"))]
+    FileSystem {
+        source: std::io::Error,
+        path: String,
     },
 
-    /// Error that occurs during SQL query execution
-    #[snafu(display("sql execution failed: {}", source,))]
-    ExecutionError { source: DBError },
+    #[snafu(display("Failed to get next row: {source}"))]
+    NextRow { source: DBError },
+
+    #[snafu(display("Invalid configuration: {message}"))]
+    Config { message: String },
 }
 
 /// Result type alias for database operations.

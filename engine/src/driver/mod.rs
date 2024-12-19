@@ -1,13 +1,14 @@
-mod duckdb;
+pub mod duckdb;
 
 use crate::error::Result;
 use async_trait::async_trait;
+use duckdb::config::Config;
 
 /// Trait for OLAP database drivers that support async operations
 #[async_trait]
-pub trait OlapDriver: Send + Sync + 'static {
+pub trait OlapDriver: Send + 'static {
     /// Creates a new driver instance from a data source string
-    fn new(ds: String) -> Result<Self>
+    fn new(dsn: String, config: Config) -> Result<Self>
     where
         Self: Sized;
 

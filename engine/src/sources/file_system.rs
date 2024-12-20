@@ -109,7 +109,7 @@ impl FileFormat {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FileSystem {
     /// Maximum file size in MB (multiple of 1024)
     max_file_size: Option<usize>,
@@ -208,6 +208,8 @@ impl FileSystem {
             extension,
             final_params,
         )?;
+
+        let sql = format!("select * from {sql}");
 
         debug!("✅ Generated SQL query: {}", sql);
         Ok(sql)

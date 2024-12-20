@@ -6,7 +6,6 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
-use tokio::fs;
 use tracing::{debug, info};
 
 use crate::driver::OlapDriver;
@@ -16,6 +15,7 @@ use super::utils::{duckdb_row_to_json, sanitize_to_sql_name};
 
 /// DuckDBDriver implements the Driver trait for DuckDB database operations
 /// providing a thread-safe interface to execute SQL queries and commands
+#[derive(Debug, Clone)]
 pub struct DuckDBDriver {
     conn: Arc<Mutex<Connection>>,
     config: Config,
@@ -88,17 +88,14 @@ impl DuckDBDriver {
     async fn create_table(&self, name: &str, create_sql: &str) -> Result<()> {
         debug!("📝 Creating new table: {}", name);
         let name = sanitize_to_sql_name(name);
-        let path = self.config.db_storage_path().join(format!("{}.db", name));
-
-        debug!("💾 Creating database file at: {:?}", path);
-        fs::File::create(&path)
-            .await
-            .context(FileSystemSnafu { path: name.clone() })?;
-
         let conn = self.conn.lock().unwrap();
 
         debug!("🔗 Attaching database file");
-        let sql = format!("attach {} as {}", format!("'./{}.db'", name), name);
+        let sql = format!(
+            "attach {} as {}",
+            format!("'{}/{}.db'", self.config.db_storage_path().display(), name),
+            name
+        );
         let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
         stmt.execute([]).context(ExecutionSnafu { sql })?;
 
@@ -204,6 +201,7 @@ impl OlapDriver for DuckDBDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::fs;
 
     // Helper function to create a test configuration
     fn create_test_config(name: String) -> Config {

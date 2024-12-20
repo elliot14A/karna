@@ -9,7 +9,7 @@ use serde_json::Value;
 
 /// Trait for OLAP database drivers that support async operations
 #[async_trait]
-pub trait OlapDriver: Send + 'static {
+pub trait OlapDriver: Send + Sync + 'static {
     fn new(config: Config) -> Result<Self>
     where
         Self: Sized;

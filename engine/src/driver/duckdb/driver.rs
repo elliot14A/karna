@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
 use tokio::fs;
+use tracing::{debug, info};
 
 use crate::driver::OlapDriver;
 
@@ -15,16 +16,15 @@ use super::utils::{duckdb_row_to_json, sanitize_to_sql_name};
 
 /// DuckDBDriver implements the Driver trait for DuckDB database operations
 /// providing a thread-safe interface to execute SQL queries and commands
-// TODO: maybe implement bb8::ManageConnection for connection pooling, does it even work with DuckDB?
-// Have separate connections for read and write operations
 pub struct DuckDBDriver {
-    /// Thread-safe connection to DuckDB
     conn: Arc<Mutex<Connection>>,
     config: Config,
 }
 
 impl DuckDBDriver {
     fn run_boot_queries(&self) -> Result<()> {
+        debug!("🚀 Initializing DuckDB extensions and boot queries");
+
         let mut boot_queries = vec![
             "install 'json'",
             "load 'json'",
@@ -43,35 +43,39 @@ impl DuckDBDriver {
         let conn = self.conn.lock().unwrap();
 
         for query in boot_queries {
+            debug!("⚙️ Executing boot query: {}", query);
             conn.execute(query, [])
                 .context(ExecutionSnafu { sql: query })?;
         }
 
-        // Forces DuckDB to create catalog entries for the information schema up front (they are normally created lazily).
-        // Obviously, copied directly from rill codebase
+        debug!("📊 Initializing information schema");
         let sql = r#"
 	          select
-			          coalesce(t.table_catalog, current_database()) as "database",
-			          t.table_schema as "schema",
-			          t.table_name as "name",
-			          t.table_type as "type", 
-			          array_agg(c.column_name order by c.ordinal_position) as "column_names",
-			          array_agg(c.data_type order by c.ordinal_position) as "column_types",
-			          array_agg(c.is_nullable = 'YES' order by c.ordinal_position) as "column_nullable"
+			    coalesce(t.table_catalog, current_database()) as "database",
+			    t.table_schema as "schema",
+			    t.table_name as "name",
+			    t.table_type as "type", 
+			    array_agg(c.column_name order by c.ordinal_position) as "column_names",
+			    array_agg(c.data_type order by c.ordinal_position) as "column_types",
+			    array_agg(c.is_nullable = 'YES' order by c.ordinal_position) as "column_nullable"
 		        from information_schema.tables t
 		        join information_schema.columns c on t.table_schema = c.table_schema and t.table_name = c.table_name
 		        group by 1, 2, 3, 4
-            order by 1, 2, 3, 4
+              order by 1, 2, 3, 4
         "#;
 
         let mut stmt = conn.prepare(sql).context(PrepareStatementSnafu)?;
         stmt.execute([]).context(ExecutionSnafu { sql })?;
 
+        info!("✅ Successfully initialized DuckDB driver");
         Ok(())
     }
 
     pub fn new(config: Config) -> Result<Self> {
+        debug!("🔧 Creating new DuckDB driver instance");
         let dsn = config.build_dsn();
+        debug!("🔌 Connecting to DuckDB with DSN: {}", dsn);
+
         let conn = Connection::open(dsn).context(ConnectionSnafu)?;
         let driver = DuckDBDriver {
             conn: Arc::new(Mutex::new(conn)),
@@ -82,47 +86,52 @@ impl DuckDBDriver {
     }
 
     async fn create_table(&self, name: &str, create_sql: &str) -> Result<()> {
+        debug!("📝 Creating new table: {}", name);
         let name = sanitize_to_sql_name(name);
         let path = self.config.db_storage_path().join(format!("{}.db", name));
-        // create new duckdb file
+
+        debug!("💾 Creating database file at: {:?}", path);
         fs::File::create(&path)
             .await
             .context(FileSystemSnafu { path: name.clone() })?;
 
         let conn = self.conn.lock().unwrap();
 
-        // attach the new duckdb file to main.db
+        debug!("🔗 Attaching database file");
         let sql = format!("attach {} as {}", format!("'./{}.db'", name), name);
         let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
         stmt.execute([]).context(ExecutionSnafu { sql })?;
 
-        // load file in to the new db file
+        debug!("🏗️ Creating table with provided SQL");
         let sql = format!(
             "create or replace table {}.default as ({}\n)",
             name, create_sql
         );
         let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
-
         stmt.execute([]).context(ExecutionSnafu { sql })?;
 
-        // create new transaction to create view
+        debug!("👁️ Creating view for table");
         let sql = Self::generate_select_query(&conn, name.to_string())?;
         let sql = format!("create or replace view {} as {}", name, sql);
         let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
         stmt.execute([]).context(ExecutionSnafu { sql })?;
 
+        info!("✅ Successfully created table and view: {}", name);
         Ok(())
     }
 
     pub fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
+        debug!("🔍 Executing query: {}", sql);
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(sql).context(PrepareStatementSnafu)?;
         let mut rows = stmt.query([]).context(ExecutionSnafu { sql })?;
 
         let mut rows_data = Vec::new();
+        let mut row_count = 0;
         while let Some(row) = rows.next().context(NextRowSnafu)? {
             let values = duckdb_row_to_json(&row)?;
             rows_data.push(values);
+            row_count += 1;
         }
 
         let schema = stmt.schema();
@@ -143,6 +152,7 @@ impl DuckDBDriver {
             })
             .collect();
 
+        debug!("📊 Query returned {} rows", row_count);
         Ok(result)
     }
 
@@ -150,6 +160,7 @@ impl DuckDBDriver {
         transaction: &MutexGuard<'_, Connection>,
         table_name: String,
     ) -> Result<String> {
+        debug!("🔧 Generating select query for table: {}", table_name);
         let sql = format!(
             r#"
 			select column_name as name
@@ -167,6 +178,7 @@ impl DuckDBDriver {
             columns.push(cols.pop().unwrap().to_string());
         }
 
+        debug!("✨ Generated select query with {} columns", columns.len());
         return Ok(format!(
             "select {} from {}.default",
             columns.join(", "),
@@ -177,7 +189,6 @@ impl DuckDBDriver {
 
 #[async_trait]
 impl OlapDriver for DuckDBDriver {
-    /// Creates a new driver instance from a data source string
     fn new(config: Config) -> Result<Self> {
         DuckDBDriver::new(config)
     }
@@ -186,12 +197,10 @@ impl OlapDriver for DuckDBDriver {
         self.create_table(table_name, sql).await
     }
 
-    /// Executes a SQL query and returns the results as JSON
     async fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
         self.query(sql)
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

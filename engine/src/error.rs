@@ -26,6 +26,9 @@ pub enum Error {
         path: String,
     },
 
+    #[snafu(display("Karna enginre does not support the format: {format}"))]
+    InvalidFormat { format: String },
+
     #[snafu(display("Failed to get next row: {source}"))]
     NextRow { source: DBError },
 

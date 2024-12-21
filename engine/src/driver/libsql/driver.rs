@@ -1,8 +1,10 @@
+use crate::driver::DatasetStore;
 use crate::error::{
     Error, LibSQLConnectionSnafu, LibSQLExecuteSnafu, LibSQLNextRowSnafu,
     LibSQLPrepareStatementSnafu, Result,
 };
-use crate::models::{CreateDataset, Dataset, UpdateDataset};
+use crate::models::{self, CreateDataset, Dataset, UpdateDataset};
+use async_trait::async_trait;
 use libsql::{de, params, Builder, Connection, Database};
 use snafu::ResultExt;
 use std::path::Path;
@@ -159,6 +161,29 @@ impl LibSQLDriver {
         de::from_row::<Dataset>(&row).map_err(|e| Error::LibSQLConverstion {
             message: e.to_string(),
         })
+    }
+}
+
+#[async_trait]
+impl DatasetStore for LibSQLDriver {
+    async fn create(&self, dataset: CreateDataset) -> Result<Dataset> {
+        self.create_dataset(dataset).await
+    }
+
+    async fn details(&self, id: String) -> Result<Option<Dataset>> {
+        self.get_dataset_by_id(id).await
+    }
+
+    async fn update(&self, dataset: UpdateDataset) -> Result<Option<models::Dataset>> {
+        self.update_dataset(dataset).await
+    }
+
+    async fn delete(&self, id: String) -> Result<()> {
+        self.delete_dataset(id).await
+    }
+
+    async fn list(&self) -> Result<Vec<Dataset>> {
+        self.list_datasets().await
     }
 }
 

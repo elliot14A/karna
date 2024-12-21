@@ -45,7 +45,7 @@ impl DuckDBDriver {
         for query in boot_queries {
             debug!("⚙️ Executing boot query: {}", query);
             conn.execute(query, [])
-                .context(ExecutionSnafu { sql: query })?;
+                .context(DuckDBExecutionSnafu { sql: query })?;
         }
 
         debug!("📊 Initializing information schema");
@@ -64,8 +64,8 @@ impl DuckDBDriver {
               order by 1, 2, 3, 4
         "#;
 
-        let mut stmt = conn.prepare(sql).context(PrepareStatementSnafu)?;
-        stmt.execute([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = conn.prepare(sql).context(DuckDBPrepareStatementSnafu)?;
+        stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
 
         info!("✅ Successfully initialized DuckDB driver");
         Ok(())
@@ -76,7 +76,7 @@ impl DuckDBDriver {
         let dsn = config.build_dsn();
         debug!("🔌 Connecting to DuckDB with DSN: {}", dsn);
 
-        let conn = Connection::open(dsn).context(ConnectionSnafu)?;
+        let conn = Connection::open(dsn).context(DuckDBConnectionSnafu)?;
         let driver = DuckDBDriver {
             conn: Arc::new(Mutex::new(conn)),
             config,
@@ -96,22 +96,22 @@ impl DuckDBDriver {
             format!("'{}/{}.db'", self.config.db_storage_path().display(), name),
             name
         );
-        let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
-        stmt.execute([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
+        stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
 
         debug!("🏗️ Creating table with provided SQL");
         let sql = format!(
             "create or replace table {}.default as ({}\n)",
             name, create_sql
         );
-        let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
-        stmt.execute([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
+        stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
 
         debug!("👁️ Creating view for table");
         let sql = Self::generate_select_query(&conn, name.to_string())?;
         let sql = format!("create or replace view {} as {}", name, sql);
-        let mut stmt = conn.prepare(&sql).context(PrepareStatementSnafu)?;
-        stmt.execute([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
+        stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
 
         info!("✅ Successfully created table and view: {}", name);
         Ok(())
@@ -120,12 +120,12 @@ impl DuckDBDriver {
     pub fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
         debug!("🔍 Executing query: {}", sql);
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(sql).context(PrepareStatementSnafu)?;
-        let mut rows = stmt.query([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = conn.prepare(sql).context(DuckDBPrepareStatementSnafu)?;
+        let mut rows = stmt.query([]).context(DuckDBExecutionSnafu { sql })?;
 
         let mut rows_data = Vec::new();
         let mut row_count = 0;
-        while let Some(row) = rows.next().context(NextRowSnafu)? {
+        while let Some(row) = rows.next().context(DuckDBNextRowSnafu)? {
             let values = duckdb_row_to_json(&row)?;
             rows_data.push(values);
             row_count += 1;
@@ -167,10 +167,12 @@ impl DuckDBDriver {
         "#,
             table_name
         );
-        let mut stmt = transaction.prepare(&sql).context(PrepareStatementSnafu)?;
-        let mut rows = stmt.query([]).context(ExecutionSnafu { sql })?;
+        let mut stmt = transaction
+            .prepare(&sql)
+            .context(DuckDBPrepareStatementSnafu)?;
+        let mut rows = stmt.query([]).context(DuckDBExecutionSnafu { sql })?;
         let mut columns = vec![];
-        while let Some(row) = rows.next().context(NextRowSnafu)? {
+        while let Some(row) = rows.next().context(DuckDBNextRowSnafu)? {
             let mut cols = duckdb_row_to_json(row)?;
             columns.push(cols.pop().unwrap().to_string());
         }

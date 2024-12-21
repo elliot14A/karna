@@ -5,20 +5,20 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    #[snafu(display("Failed to connect to database: {source}"))]
-    Connection { source: DBError },
+    #[snafu(display("Failed to connect to duckdb: {source}"))]
+    DuckDBConnection { source: DBError },
 
-    #[snafu(display("Failed to prepare statement: {source}"))]
-    PrepareStatement { source: DBError },
+    #[snafu(display("Failed to prepare duckdb statement: {source}"))]
+    DuckDBPrepareStatement { source: DBError },
 
     #[snafu(display("Failed to convert DuckDB value: {message}"))]
     DuckDBValueConversion { message: String },
 
-    #[snafu(display("Failed to execute query '{sql}': {source}"))]
-    Execution { source: DBError, sql: String },
+    #[snafu(display("Failed to execute duckdb query '{sql}': {source}"))]
+    DuckDBExecution { source: DBError, sql: String },
 
     #[snafu(display("Transaction error: {source}"))]
-    Transaction { source: DBError },
+    DuckDBTransaction { source: DBError },
 
     #[snafu(display("File system error at '{path}': {source}"))]
     FileSystem {
@@ -30,10 +30,25 @@ pub enum Error {
     InvalidFormat { format: String },
 
     #[snafu(display("Failed to get next row: {source}"))]
-    NextRow { source: DBError },
+    DuckDBNextRow { source: DBError },
 
     #[snafu(display("Invalid configuration: {message}"))]
     Config { message: String },
+
+    #[snafu(display("Failed to connect to libsql: {source}"))]
+    LibSQLConnection { source: libsql::Error },
+
+    #[snafu(display("Failed to execute libsql query '{sql}': {source}"))]
+    LibSQLExecute { source: libsql::Error, sql: String },
+
+    #[snafu(display("Failed to get next row from libsql: {source}"))]
+    LibSQLNextRow { source: libsql::Error },
+
+    #[snafu(display("Failed to convert libsql value: {message}"))]
+    LibSQLConverstion { message: String },
+
+    #[snafu(display("Failed to prepare libsql statement '{sql}' : {source}"))]
+    LibSQLPrepareStatement { source: libsql::Error, sql: String },
 }
 
 /// Result type alias for database operations.

@@ -13,7 +13,6 @@ pub mod constants {
     pub const AUTO_DETECT: &str = "auto_detect";
     pub const MAXIMUM_LINE_SIZE: &str = "maximum_line_size";
     pub const COMPRESSION: &str = "compression";
-    pub const FILE_ROW_NUMBER: &str = "filename";
     pub const UNION_BY_NAME: &str = "union_by_name";
 
     pub const DEFAULT_SAMPLE_SIZE: &str = "1000";
@@ -82,7 +81,6 @@ impl FileFormat {
             FileFormat::Csv | FileFormat::Tsv => {
                 debug!("📊 Setting CSV/TSV specific parameters");
                 params.insert(HAS_HEADER.to_string(), "true".to_string());
-                params.insert(FILE_ROW_NUMBER.to_string(), "false".to_string());
 
                 if matches!(self, FileFormat::Tsv) {
                     debug!("📑 Setting TSV delimiter");
@@ -99,7 +97,6 @@ impl FileFormat {
             FileFormat::Parquet => {
                 debug!("📦 Setting Parquet specific parameters");
                 params.insert(UNION_BY_NAME.to_string(), "true".to_string());
-                params.insert(FILE_ROW_NUMBER.to_string(), "false".to_string());
             }
             _ => {}
         }

@@ -12,6 +12,7 @@ pub struct Config {
     boot_queries: Vec<String>,
     db_file_path: PathBuf,
     db_storage_path: PathBuf,
+    pool_size: Option<u32>,
 }
 
 impl Config {
@@ -39,6 +40,7 @@ impl Config {
             boot_queries: Vec::new(),
             db_file_path: dsn_path.to_path_buf(),
             db_storage_path: db_storage_path.to_path_buf(),
+            pool_size: None,
         })
     }
 
@@ -120,6 +122,17 @@ impl Config {
         self
     }
 
+    pub fn with_pool_size(mut self, pool_size: u32) -> Result<Self> {
+        if pool_size == 0 {
+            return ConfigSnafu {
+                message: "Pool size must be greater than zero".to_string(),
+            }
+            .fail();
+        }
+        self.pool_size = Some(pool_size);
+        Ok(self)
+    }
+
     // Getters
     pub fn dsn(&self) -> &str {
         &self.dsn
@@ -143,6 +156,10 @@ impl Config {
 
     pub fn db_file_path(&self) -> &Path {
         &self.db_file_path
+    }
+
+    pub fn pool_size(&self) -> Option<u32> {
+        self.pool_size
     }
 
     pub fn db_storage_path(&self) -> &Path {

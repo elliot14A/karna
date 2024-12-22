@@ -5,8 +5,11 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    #[snafu(display("Failed to connect to duckdb: {source}"))]
+    #[snafu(display("Failed to get duckdb connection from pool: {source}"))]
     DuckDBConnection { source: DBError },
+
+    #[snafu(display("Pool error: {source}"))]
+    DuckDBPool { source: r2d2::Error },
 
     #[snafu(display("Failed to prepare duckdb statement: {source}"))]
     DuckDBPrepareStatement { source: DBError },

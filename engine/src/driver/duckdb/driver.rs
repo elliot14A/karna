@@ -1,23 +1,22 @@
+use crate::driver::OlapDriver;
 use crate::error::*;
 use async_trait::async_trait;
-use duckdb::Connection;
+use duckdb::DuckdbConnectionManager;
+use r2d2::Pool;
+use r2d2::PooledConnection;
 use serde_json::Value;
 use snafu::ResultExt;
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::{Mutex, MutexGuard};
 use tracing::{debug, info};
-
-use crate::driver::OlapDriver;
 
 use super::config::Config;
 use super::utils::{duckdb_row_to_json, sanitize_to_sql_name};
 
 /// DuckDBDriver implements the Driver trait for DuckDB database operations
 /// providing a thread-safe interface to execute SQL queries and commands
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DuckDBDriver {
-    conn: Arc<Mutex<Connection>>,
+    pool: Pool<DuckdbConnectionManager>,
     config: Config,
 }
 
@@ -40,7 +39,7 @@ impl DuckDBDriver {
 
         boot_queries.extend(self.config.boot_queries().iter().map(String::as_str));
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.get_connention()?;
 
         for query in boot_queries {
             debug!("⚙️ Executing boot query: {}", query);
@@ -76,19 +75,26 @@ impl DuckDBDriver {
         let dsn = config.build_dsn();
         debug!("🔌 Connecting to DuckDB with DSN: {}", dsn);
 
-        let conn = Connection::open(dsn).context(DuckDBConnectionSnafu)?;
-        let driver = DuckDBDriver {
-            conn: Arc::new(Mutex::new(conn)),
-            config,
-        };
+        let pool_size = config.pool_size().unwrap_or(4);
+
+        let manager = DuckdbConnectionManager::file(dsn).context(DuckDBConnectionSnafu)?;
+        let pool = Pool::builder()
+            .max_size(pool_size)
+            .build(manager)
+            .context(DuckDBPoolSnafu)?;
+        let driver = DuckDBDriver { pool, config };
         driver.run_boot_queries()?;
         Ok(driver)
     }
 
-    async fn create_table(&self, name: &str, create_sql: &str) -> Result<()> {
+    pub fn get_connention(&self) -> Result<PooledConnection<DuckdbConnectionManager>> {
+        self.pool.get().context(DuckDBPoolSnafu)
+    }
+
+    async fn create_table(&self, name: &str, create_sql: &str) -> Result<String> {
         debug!("📝 Creating new table: {}", name);
         let name = sanitize_to_sql_name(name);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.get_connention()?;
 
         debug!("🔗 Attaching database file");
         let sql = format!(
@@ -108,18 +114,18 @@ impl DuckDBDriver {
         stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
 
         debug!("👁️ Creating view for table");
-        let sql = Self::generate_select_query(&conn, name.to_string())?;
+        let sql = self.generate_select_query(name.to_string())?;
         let sql = format!("create or replace view {} as {}", name, sql);
         let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
         stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
 
         info!("✅ Successfully created table and view: {}", name);
-        Ok(())
+        Ok(name)
     }
 
     pub fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
         debug!("🔍 Executing query: {}", sql);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.get_connention()?;
         let mut stmt = conn.prepare(sql).context(DuckDBPrepareStatementSnafu)?;
         let mut rows = stmt.query([]).context(DuckDBExecutionSnafu { sql })?;
 
@@ -153,10 +159,7 @@ impl DuckDBDriver {
         Ok(result)
     }
 
-    fn generate_select_query(
-        transaction: &MutexGuard<'_, Connection>,
-        table_name: String,
-    ) -> Result<String> {
+    fn generate_select_query(&self, table_name: String) -> Result<String> {
         debug!("🔧 Generating select query for table: {}", table_name);
         let sql = format!(
             r#"
@@ -167,9 +170,9 @@ impl DuckDBDriver {
         "#,
             table_name
         );
-        let mut stmt = transaction
-            .prepare(&sql)
-            .context(DuckDBPrepareStatementSnafu)?;
+
+        let conn = self.get_connention()?;
+        let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
         let mut rows = stmt.query([]).context(DuckDBExecutionSnafu { sql })?;
         let mut columns = vec![];
         while let Some(row) = rows.next().context(DuckDBNextRowSnafu)? {
@@ -192,7 +195,7 @@ impl OlapDriver for DuckDBDriver {
         DuckDBDriver::new(config)
     }
 
-    async fn create_table(&self, table_name: &str, sql: &str) -> Result<()> {
+    async fn create_table(&self, table_name: &str, sql: &str) -> Result<String> {
         self.create_table(table_name, sql).await
     }
 
@@ -246,7 +249,9 @@ mod tests {
         clean_up(db.clone()).await.unwrap();
         let config = create_test_config(db.clone());
         let driver = DuckDBDriver::new(config).unwrap();
-        let conn = driver.conn.lock().unwrap();
+        let conn = driver.get_connention();
+        assert!(conn.is_ok());
+        let conn = conn.unwrap();
 
         // Test JSON extension
         let result = conn.execute("SELECT json_structure('[1,2,3]')", []);

@@ -9,6 +9,7 @@ uuid = { version = "1.10.0", features = ["serde"] }
 base64 = "0.22"
 num_cpus = "1"
 r2d2 = "0.8"
+rand = "0.8"
 libsql = { version = "0.6", features = ["core"] }
 tracing.workspace = true
 snafu.workspace = true

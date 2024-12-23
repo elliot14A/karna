@@ -2,6 +2,7 @@ use crate::error::{DuckDBValueConversionSnafu, Error, Result};
 use chrono::prelude::{DateTime, NaiveDate, NaiveTime};
 use duckdb::types::{OrderedMap, TimeUnit, Value as DuckDBValue};
 
+use rand::{thread_rng, Rng};
 use serde_json::{Map, Number, Value as JsonValue};
 use snafu::OptionExt;
 
@@ -201,6 +202,10 @@ pub fn sanitize_to_sql_name(filename: &str) -> String {
         sanitized
     };
 
+    // add a unique suffix of length 6 chars to avoid conflicts
+    let suffix = generate_random_string(6);
+    let valid_start = format!("{}_{}", valid_start, suffix);
+
     // Truncate if necessary, ensuring we don't cut in the middle of an underscore
     if valid_start.len() > MAX_LENGTH {
         let truncated = &valid_start[..MAX_LENGTH];
@@ -211,4 +216,16 @@ pub fn sanitize_to_sql_name(filename: &str) -> String {
     } else {
         valid_start
     }
+}
+
+fn generate_random_string(length: usize) -> String {
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let mut rng = thread_rng();
+
+    (0..length)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
 }

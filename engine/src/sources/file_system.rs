@@ -11,12 +11,10 @@ pub mod constants {
     pub const SAMPLE_SIZE: &str = "sample_size";
     pub const ALL_VARCHAR: &str = "all_varchar";
     pub const AUTO_DETECT: &str = "auto_detect";
-    pub const MAXIMUM_LINE_SIZE: &str = "maximum_line_size";
     pub const COMPRESSION: &str = "compression";
     pub const UNION_BY_NAME: &str = "union_by_name";
 
     pub const DEFAULT_SAMPLE_SIZE: &str = "1000";
-    pub const DEFAULT_MAX_LINE_SIZE: &str = "104857600"; // 100MB
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,10 +87,6 @@ impl FileFormat {
             }
             FileFormat::Json => {
                 debug!("📋 Setting JSON specific parameters");
-                params.insert(
-                    MAXIMUM_LINE_SIZE.to_string(),
-                    DEFAULT_MAX_LINE_SIZE.to_string(),
-                );
             }
             FileFormat::Parquet => {
                 debug!("📦 Setting Parquet specific parameters");

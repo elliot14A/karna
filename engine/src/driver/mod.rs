@@ -26,7 +26,11 @@ pub trait DatasetStore: Send + Sync + 'static {
 
     async fn details(&self, id: String) -> Result<Option<models::Dataset>>;
 
-    async fn update(&self, dataset: models::UpdateDataset) -> Result<Option<models::Dataset>>;
+    async fn update(
+        &self,
+        id: String,
+        dataset: models::UpdateDataset,
+    ) -> Result<Option<models::Dataset>>;
 
     async fn delete(&self, id: String) -> Result<()>;
 

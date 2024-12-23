@@ -40,6 +40,5 @@ pub struct CreateDataset {
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateDataset {
-    pub id: String,
     pub description: Option<String>,
 }

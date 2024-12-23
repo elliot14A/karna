@@ -10,7 +10,6 @@ use engine::{
     models::{CreateDataset, Dataset},
     sources::file_system::FileSystem,
 };
-use serde::Serialize;
 use snafu::ResultExt;
 use std::{collections::HashMap, os::unix::fs::MetadataExt, path::PathBuf, sync::Arc};
 use tokio::{
@@ -18,16 +17,6 @@ use tokio::{
     io::{AsyncWriteExt, BufWriter},
 };
 use tracing::{debug, error, info, instrument};
-
-#[derive(Debug, Serialize)]
-struct UploadResponse {
-    data: Dataset,
-}
-
-#[derive(Debug, Serialize)]
-struct ErrorResponse {
-    error: String,
-}
 
 #[instrument(skip(olap, store, source, multipart))]
 pub async fn upload_file_system<O: OlapDriver, S: DatasetStore>(
@@ -65,7 +54,7 @@ pub async fn upload_file_system<O: OlapDriver, S: DatasetStore>(
 
     cleanup_temp_file(filepath).await?;
 
-    Ok((StatusCode::CREATED, Json(UploadResponse { data: dataset })).into_response())
+    Ok((StatusCode::CREATED, Json(dataset)).into_response())
 }
 
 async fn get_multipart_field(
@@ -85,7 +74,7 @@ async fn get_multipart_field(
 fn get_filename(field: &axum::extract::multipart::Field<'_>) -> Result<String> {
     match field.file_name() {
         Some(name) => {
-            info!("Processing file: {}", name);
+            // remove extension from filename
             Ok(name.to_string())
         }
         None => {
@@ -152,7 +141,7 @@ async fn process_file_upload<O: OlapDriver>(
 
     validate_file(&source, &filepath)?;
     let create_sql = generate_sql(&source, &filepath)?;
-    let table_name = create_table(&olap, &filename, &create_sql).await?;
+    let table_name = create_table(&olap, &filename.split(".").next().unwrap(), &create_sql).await?;
     let row_count = get_row_count(&olap, &table_name).await?;
 
     info!("File processing completed - Row count: {}", row_count);

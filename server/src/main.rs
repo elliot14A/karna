@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
-use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
 
 use api::middleware::create_logger_middleware;

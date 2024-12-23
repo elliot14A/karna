@@ -132,12 +132,16 @@ impl LibSQLDriver {
         Ok(())
     }
 
-    pub async fn update_dataset(&self, input: UpdateDataset) -> Result<Option<Dataset>> {
+    pub async fn update_dataset(
+        &self,
+        id: String,
+        input: UpdateDataset,
+    ) -> Result<Option<Dataset>> {
         const SQL: &str = "update dataset set description = ? where id = ? returning *;";
 
         let mut stmt = self.prepare_statement(SQL).await?;
         let row = stmt
-            .query(params![input.description, input.id])
+            .query(params![input.description, id])
             .await
             .context(LibSQLExecuteSnafu { sql: SQL })?
             .next()
@@ -174,8 +178,8 @@ impl DatasetStore for LibSQLDriver {
         self.get_dataset_by_id(id).await
     }
 
-    async fn update(&self, dataset: UpdateDataset) -> Result<Option<models::Dataset>> {
-        self.update_dataset(dataset).await
+    async fn update(&self, id: String, dataset: UpdateDataset) -> Result<Option<models::Dataset>> {
+        self.update_dataset(id, dataset).await
     }
 
     async fn delete(&self, id: String) -> Result<()> {
@@ -330,13 +334,14 @@ mod tests {
 
         let created_dataset = driver.create_dataset(input).await?;
 
+        let id = created_dataset.id.clone();
+
         // Update the description
         let update_input = UpdateDataset {
-            id: created_dataset.id.clone(),
             description: Some("Updated description".to_string()),
         };
 
-        let updated_dataset = driver.update_dataset(update_input).await?;
+        let updated_dataset = driver.update_dataset(id, update_input).await?;
         assert!(updated_dataset.is_some(), "Update failed");
         let updated_dataset = updated_dataset.unwrap();
         assert_eq!(
@@ -395,10 +400,12 @@ mod tests {
 
         // Attempt to update non-existent dataset
         let update_result = driver
-            .update_dataset(UpdateDataset {
-                id: "non-existent-id".to_string(),
-                description: Some("New description".to_string()),
-            })
+            .update_dataset(
+                "non-existent-id".to_string(),
+                UpdateDataset {
+                    description: Some("New description".to_string()),
+                },
+            )
             .await?;
         assert!(update_result.is_none(), "Update should fail");
 

@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use serde::Serialize;
 use snafu::Snafu;
 
 #[derive(Debug, Snafu)]
@@ -22,26 +23,33 @@ pub enum Error {
         source: std::io::Error,
         message: String,
     },
+
+    #[snafu(display("Not found: {message}"))]
+    NotFound { message: String },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[derive(Serialize)]
+struct ErrorMessage {
+    message: String,
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        match self {
+        let (status, message) = match self {
+            Self::NotFound { message } => (StatusCode::NOT_FOUND, message),
             Self::MultiPart { source } => (
                 StatusCode::BAD_REQUEST,
                 format!("Failed to read multipart: {}", source.to_string()),
-            )
-                .into_response(),
-            Self::Internal { message } => {
-                (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
-            }
-            Self::BadReq { message } => (StatusCode::BAD_REQUEST, message).into_response(),
-            Self::FileError { message, .. } => {
-                (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
-            }
-        }
+            ),
+            Self::Internal { message } => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            Self::BadReq { message } => (StatusCode::BAD_REQUEST, message),
+            Self::FileError { message, .. } => (StatusCode::INTERNAL_SERVER_ERROR, message),
+        };
+
+        let error_message = ErrorMessage { message };
+        (status, axum::Json(error_message)).into_response()
     }
 }
 

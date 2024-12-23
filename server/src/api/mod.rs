@@ -9,8 +9,11 @@ async fn health_check() -> impl IntoResponse {
 }
 
 pub fn routes() -> Router {
-    Router::new().route("/health", get(health_check)).nest(
-        "/datasets",
-        datasets::routes::<DuckDBDriver, LibSQLDriver>(),
-    )
+    Router::new()
+        .route("/health", get(health_check))
+        .nest(
+            "/datasets",
+            datasets::routes::<DuckDBDriver, LibSQLDriver>(),
+        )
+        .nest("/query", query::router::<DuckDBDriver>())
 }

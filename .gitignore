@@ -15,3 +15,4 @@ playwright/.cache/
 bun.lockb
 karna
 /**/*/*.db
+.git

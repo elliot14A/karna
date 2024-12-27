@@ -6,17 +6,31 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+leptos-use.workspace = true
 leptos.workspace = true
 leptos_meta.workspace = true
 leptos_router.workspace = true
 leptos_axum = { workspace = true, optional = true }
-
 http.workspace = true
 cfg-if.workspace = true
 thiserror.workspace = true
+serde.workspace = true
+codee = { version = "0.2", features = ["json_serde"] }
+tracing.workspace = true
+chrono.workspace = true
+console_error_panic_hook.workspace = true
+console_log.workspace = true
+log.workspace = true
+wasm-bindgen.workspace = true
 
 [features]
 default = []
-hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
-ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "dep:leptos_axum"]
-
+hydrate = ["leptos/hydrate"]
+ssr = [
+  "leptos/ssr",
+  "leptos_meta/ssr",
+  "leptos_router/ssr",
+  "dep:leptos_axum",
+  "leptos-use/ssr",
+  "leptos-use/axum",
+]

@@ -1,48 +1,53 @@
-use crate::error_template::{AppError, ErrorTemplate};
+#![allow(dead_code)]
 
-use leptos::*;
+use common::theme::ThemeSwitcher;
+use leptos::prelude::*;
 use leptos_meta::*;
-use leptos_router::*;
+use leptos_router::components::{Route, Router, Routes};
+use leptos_router::path;
+use pages::home::HomePage;
 
-pub mod error_template;
+mod common;
+mod components;
+mod error_template;
+mod pages;
 
-#[component]
-pub fn App() -> impl IntoView {
-    // Provides context that manages stylesheets, titles, meta tags, etc.
-    provide_meta_context();
-
+pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
-        <Stylesheet id="leptos" href="/pkg/karna.css"/>
-
-        // sets the document title
-        <Title text="Welcome to Leptos"/>
-
-        // content for this welcome page
-        <Router fallback=|| {
-            let mut outside_errors = Errors::default();
-            outside_errors.insert_with_default_key(AppError::NotFound);
-            view! { <ErrorTemplate outside_errors/> }.into_view()
-        }>
-            <main>
-                <Routes>
-                    <Route path="" view=HomePage/>
-                </Routes>
-            </main>
-        </Router>
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <AutoReload options=options.clone() />
+                <HydrationScripts options />
+                <MetaTags />
+            </head>
+            <body>
+                <App />
+            </body>
+        </html>
     }
 }
 
-/// Renders the home page of your application.
 #[component]
-fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(0);
-    let on_click = move |_| set_count.update(|count| *count += 1);
+pub fn App() -> impl IntoView {
+    provide_meta_context();
+
+    let theme = ThemeSwitcher::new();
+    provide_context(theme.clone());
 
     view! {
-        <div class="flex items-center justify-center flex-col">
-            <h1 class="text-center">"Welcome to Leptos!"</h1>
-            <button class="btn btn-primary" on:click=on_click>"Click Me: " {count}</button>
-        </div>
+        <Html attr:data-theme={move || theme.current.get().to_string()} {..} class="h-full" />
+        <>
+            <Stylesheet id="karna" href="/pkg/karna.css" />
+            <Router>
+                <main>
+                    <Routes fallback=|| "Not found.">
+                        <Route path=path!("/") view=HomePage />
+                    </Routes>
+                </main>
+            </Router>
+        </>
     }
 }

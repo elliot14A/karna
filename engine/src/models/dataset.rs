@@ -8,15 +8,15 @@ pub struct Dataset {
     pub file_name: String,
     pub r#type: String,
     pub description: Option<String>,
-    #[serde(deserialize_with = "parse_sqlite_datetime")]
+    #[serde(deserialize_with = "parse_libsql_datetime")]
     pub created_at: DateTime<Utc>,
-    #[serde(deserialize_with = "parse_sqlite_datetime")]
+    #[serde(deserialize_with = "parse_libsql_datetime")]
     pub updated_at: DateTime<Utc>,
     pub row_count: u64,
     pub size: u64,
 }
 
-fn parse_sqlite_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+fn parse_libsql_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
     D: Deserializer<'de>,
 {

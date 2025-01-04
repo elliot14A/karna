@@ -7,6 +7,7 @@ use leptos_router::components::{Route, Router, Routes};
 use leptos_router::path;
 use pages::home::HomePage;
 
+mod actions;
 mod common;
 mod components;
 mod error_template;

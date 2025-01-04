@@ -12,7 +12,7 @@ pub fn HomePage() -> impl IntoView {
                 <div class="drawer lg:drawer-open">
                     <input id="sidebar" type="checkbox" class="drawer-toggle" />
                     <div class="drawer-content flex flex-col items-center justify-center">
-                        <label for="sidebar" >
+                        <label for="sidebar">
                             <p class="text-lg">Welcome to karna</p>
                         </label>
                     </div>

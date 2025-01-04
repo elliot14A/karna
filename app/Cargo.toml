@@ -15,13 +15,19 @@ http.workspace = true
 cfg-if.workspace = true
 thiserror.workspace = true
 serde.workspace = true
-codee = { version = "0.2", features = ["json_serde"] }
+serde_json.workspace = true
+snafu.workspace = true
 tracing.workspace = true
 chrono.workspace = true
 console_error_panic_hook.workspace = true
 console_log.workspace = true
 log.workspace = true
 wasm-bindgen.workspace = true
+codee = { version = "0.2", features = ["json_serde"] }
+web-sys = "0.3.76"
+gloo-net = "0.6.0"
+send_wrapper = "0.6"
+wasm-bindgen-futures = "0.4"
 
 [features]
 default = []

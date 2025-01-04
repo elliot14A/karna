@@ -44,16 +44,6 @@ async fn main() {
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);
 
-    // build our application with a route
-    let app = Router::new()
-        .layer(cors)
-        .leptos_routes(&leptos_options, routes, {
-            let leptos_options = leptos_options.clone();
-            move || shell(leptos_options.clone())
-        })
-        .fallback(leptos_axum::file_and_error_handler(shell))
-        .with_state(leptos_options);
-
     // get current directory
     let path = std::env::current_dir().unwrap();
     let path = path.join("./karna/main.db");
@@ -80,6 +70,16 @@ async fn main() {
 
     // Initialize file system source
     let file_system = FileSystem::new();
+
+    // build our application with a route
+    let app = Router::new()
+        .layer(cors)
+        .leptos_routes(&leptos_options, routes, {
+            let leptos_options = leptos_options.clone();
+            move || shell(leptos_options.clone())
+        })
+        .fallback(leptos_axum::file_and_error_handler(shell))
+        .with_state(leptos_options);
 
     let app = app
         .nest("/api", api::routes())

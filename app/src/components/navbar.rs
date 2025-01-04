@@ -8,7 +8,7 @@ pub fn Navbar() -> impl IntoView {
     let current_theme = theme.current;
 
     view! {
-        <div class="navbar bg-base-100 px-4 border-b-2 border-base-200">
+        <div class="navbar bg-base-100 px-4 border-b-2 border-base-200 rounded-box">
             <div class="flex-1 items-center">
                 <p class="text-xl font-bold flex items-center gap-2">
                     <span>"🌞"</span>

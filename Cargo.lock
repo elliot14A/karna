@@ -125,6 +125,7 @@ dependencies = [
  "codee",
  "console_error_panic_hook",
  "console_log",
+ "gloo-net",
  "http 1.2.0",
  "leptos",
  "leptos-use",
@@ -132,10 +133,15 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "log",
+ "send_wrapper",
  "serde",
+ "serde_json",
+ "snafu",
  "thiserror 1.0.69",
  "tracing",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -447,6 +453,7 @@ checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
 dependencies = [
  "async-trait",
  "axum-core 0.4.5",
+ "axum-macros",
  "bytes",
  "futures-util",
  "http 1.2.0",
@@ -510,6 +517,17 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "axum-macros"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57d123550fa8d071b7255cb0cc04dc302baa6c8c4a79f55701552684d8399bce"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.92",
 ]
 
 [[package]]

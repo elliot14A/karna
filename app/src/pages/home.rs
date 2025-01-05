@@ -4,7 +4,7 @@ use leptos::prelude::*;
 use leptos::{component, view, IntoView};
 
 #[derive(Debug, Clone)]
-enum Selected {
+pub enum Selected {
     Dataset(String),
     Notebook(String),
 }
@@ -47,7 +47,11 @@ pub fn HomePage() -> impl IntoView {
                         </label>
                     </div>
                     <div class="drawer-side">
-                        <Sidebar datasets_res=datasets_res trigger=set_trigger />
+                        <Sidebar
+                            datasets_res=datasets_res
+                            trigger=set_trigger
+                            selected=set_selected
+                        />
                     </div>
                 </div>
             </div>

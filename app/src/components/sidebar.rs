@@ -1,11 +1,12 @@
 use crate::{actions::datasets::{upload_file_system, delete as delete_dataset}, common::models::Dataset};
 use leptos::{prelude::*, task::spawn_local};
+use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 use web_sys::{Event, HtmlInputElement};
-
+use crate::pages::home::Selected;
 
 #[component]
-pub fn Sidebar(datasets_res: LocalResource<Vec<Dataset>>, trigger: WriteSignal<i32>) -> impl IntoView {
+pub fn Sidebar(datasets_res: LocalResource<Vec<Dataset>>, trigger: WriteSignal<i32>, selected: WriteSignal<Selected>) -> impl IntoView {
     let notebook_res = LocalResource::new(|| async move {
                         vec!["Notebook 1".to_owned()]
                     });
@@ -16,7 +17,7 @@ pub fn Sidebar(datasets_res: LocalResource<Vec<Dataset>>, trigger: WriteSignal<i
                 <Upload trigger=trigger />
                 <li>
                     <Notebooks notebooks_res=notebook_res />
-                    <Datasets datasets_res=datasets_res trigger=trigger />
+                    <Datasets datasets_res=datasets_res trigger=trigger selected=selected />
                 </li>
             </ul>
         </>
@@ -81,90 +82,146 @@ pub fn Upload(trigger: WriteSignal<i32>) -> impl IntoView {
     }
 }
 
+
+// Components
 #[component]
-pub fn Datasets(datasets_res: LocalResource<Vec<Dataset>>, trigger: WriteSignal<i32>) -> impl IntoView {
-    let delete_action = Action::new(move |dataset_id: &String|  {
+fn DatasetIcon() -> impl IntoView {
+    view! {
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+        </svg>
+    }
+}
+
+#[component]
+fn DeleteIcon() -> impl IntoView {
+    view! {
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4 text-error"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+        </svg>
+    }
+}
+
+#[component]
+fn DatasetItem(id: String,name: String,on_select: Callback<String>,on_delete: Callback<String>,) -> impl IntoView {
+    let select_id = id.clone();
+    let delete_id = id.clone();
+
+    view! {
+        <li class="relative group hover:bg-base-200 rounded-btn">
+
+            <div class="flex items-center justify-between w-full">
+                <a class="flex-1" on:click=move |_| on_select.run(select_id.clone())>
+                    <div class="flex items-center">
+                        <DatasetIcon />
+                        <span class="font-medium truncate">{name}</span>
+                    </div>
+                </a>
+                <button
+                    class="btn btn-ghost hover:bg-transparent btn-xs opacity-0 group-hover:opacity-100 transition-opacity ml-2 cursor-pointer"
+                    title="Delete dataset"
+                    on:click=move |_| {
+                        leptos::logging::log!("Delete dataset");
+                        on_delete.run(delete_id.clone());
+                    }
+                >
+                    <DeleteIcon />
+                </button>
+            </div>
+        </li>
+    }
+}
+
+#[component]
+pub fn DatasetsList(
+    datasets: SendWrapper<Vec<Dataset>>,
+    on_select: Callback<String>,
+    on_delete: Callback<String>,
+) -> impl IntoView {
+    if datasets.is_empty() {
+        view! { <li>"No dataset found"</li> }.into_any()
+    } else {
+        datasets
+            .iter()
+            .map(|dataset| {
+                view! {
+                    <DatasetItem
+                        id=dataset.id.clone()
+                        name=dataset.name.clone()
+                        on_select=on_select.clone()
+                        on_delete=on_delete.clone()
+                    />
+                }
+            })
+            .collect_view()
+            .into_any()
+    }
+}
+
+#[component]
+pub fn Datasets(
+    datasets_res: LocalResource<Vec<Dataset>>,
+    trigger: WriteSignal<i32>,
+    selected: WriteSignal<Selected>
+) -> impl IntoView {
+    let delete_action = Action::new(move |dataset_id: &String| {
         let dataset_id = dataset_id.to_owned();
         async move {
-            delete_dataset(dataset_id).await.unwrap(); 
+            delete_dataset(dataset_id).await.unwrap();
             trigger.update(|x| *x += 1);
         }
     });
+
+    let on_select = Callback::new(move |id: String| {
+        selected.set(Selected::Dataset(id));
+    });
+
+    let on_delete = Callback::new(move |id: String| {
+        delete_action.dispatch_local(id);
+    });
+
     view! {
-        <h3 class="menu-title text-lg">Datasets</h3>
+        <h3 class="menu-title text-lg">"Datasets"</h3>
         <ul class="min-h-16 max-h-96 overflow-y-auto">
             <Suspense fallback=move || {
                 view! { <span class="loading loading-dots loading-md"></span> }
             }>
-
                 {move || {
-                    let datasets = datasets_res.get();
-                    match datasets {
-                        Some(datasets) => {
-                            if datasets.is_empty() {
-                                return view! { <li>"No dataset found"</li> }.into_any();
+                    datasets_res
+                        .get()
+                        .map(|datasets| {
+                            view! {
+                                <DatasetsList
+                                    datasets=datasets
+                                    on_select=on_select.clone()
+                                    on_delete=on_delete.clone()
+                                />
                             }
-                            datasets
-                                .iter()
-                                .map(|dataset| {
-                                    let dataset_id = dataset.id.clone();
-
-                                    view! {
-                                        <li class="relative group hover:bg-base-200 rounded-btn">
-                                            <div class="flex items-center justify-between w-full">
-                                                <a class="flex-1">
-                                                    <div class="flex items-center">
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-5 w-5 mr-1"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                stroke-linecap="round"
-                                                                stroke-linejoin="round"
-                                                                stroke-width="2"
-                                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                                            />
-                                                        </svg>
-                                                        <span class="font-medium truncate">
-                                                            {dataset.name.clone()}
-                                                        </span>
-                                                    </div>
-                                                </a>
-                                                <button
-                                                    class="btn btn-ghost hover:bg-transparent btn-xs opacity-0 group-hover:opacity-100 transition-opacity ml-2 cursor-pointer"
-                                                    title="Delete dataset"
-                                                    on:click=move |_| {
-                                                        leptos::logging::log!("Delete dataset");
-                                                        delete_action.dispatch_local(dataset_id.clone());
-                                                    }
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        class="h-4 w-4 text-error"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </li>
-                                    }
-                                })
-                                .collect_view()
                                 .into_any()
-                        }
-                        None => view! { <li>"No dataset found"</li> }.into_any(),
-                    }
+                        })
+                        .unwrap_or_else(|| view! { <li>"No dataset found"</li> }.into_any())
                 }}
             </Suspense>
         </ul>

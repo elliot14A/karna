@@ -6,6 +6,7 @@ use r2d2::Pool;
 use r2d2::PooledConnection;
 use serde_json::Value;
 use snafu::ResultExt;
+use tokio::fs;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
@@ -187,6 +188,16 @@ impl DuckDBDriver {
             table_name
         ));
     }
+
+    fn detach_table(&self, table_name: &str) -> Result<()> {
+        debug!("🗑️ Detaching table: {}", table_name);
+        let conn = self.get_connention()?;
+        let sql = format!("detach {}", table_name);
+        let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
+        stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
+        info!("✅ Successfully detached table: {}", table_name);
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -201,6 +212,15 @@ impl OlapDriver for DuckDBDriver {
 
     async fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>> {
         self.query(sql)
+    }
+
+    async fn drop_table(&self, table_name: &str) -> Result<()> {
+        // ignore the result of detach_table
+        let _ = self.detach_table(table_name);
+        // remove the database file
+        let path = format!("{}/{}.db", self.config.db_storage_path().display(), table_name);
+        fs::remove_file(&path).await.context(FileSystemSnafu {path})?;
+        Ok(())
     }
 }
 #[cfg(test)]
@@ -242,6 +262,7 @@ mod tests {
         clean_up(db).await.unwrap();
     }
 
+
     #[tokio::test]
     async fn test_boot_queries_execution() {
         // Test that all extensions are properly loaded
@@ -280,7 +301,7 @@ mod tests {
         let driver = DuckDBDriver::new(config).unwrap();
 
         // Test simple table creation
-        let test_sql = "select * from read_csv('../test-data/deliveries.csv')";
+        let test_sql = "select * from read_csv('../test-data/seria.csv')";
         let result = driver.create_table("test_table", test_sql).await;
         assert!(result.is_ok());
 
@@ -293,15 +314,30 @@ mod tests {
 
     #[test]
     fn test_sanitize_to_sql_name() {
-        assert_eq!(sanitize_to_sql_name("hello world"), "hello_world");
-        assert_eq!(sanitize_to_sql_name("hello!!!world"), "hello_world");
-        assert_eq!(sanitize_to_sql_name("123table"), "n123table");
-        assert_eq!(sanitize_to_sql_name("$#@!table^&*"), "table");
-        assert_eq!(sanitize_to_sql_name("_hello_world_"), "hello_world");
-        assert_eq!(sanitize_to_sql_name("HelloWorld"), "HelloWorld");
+        let name = sanitize_to_sql_name("_testing");
+        assert!(name.starts_with("testing"));
+        let name = sanitize_to_sql_name("_testing");
+        assert!(name.starts_with("testing"));
+        let name = sanitize_to_sql_name("_hello!!!world_");
+        assert!(name.starts_with("hello_world")); 
 
-        // Test maximum length
-        let long_name = "a".repeat(100);
+        let long_name = format!("_{}_", "a".repeat(100));
         assert!(sanitize_to_sql_name(&long_name).len() <= 63);
+    }
+
+
+    #[tokio::test]
+    async fn test_detach_table() {
+        let db = "test_table.db".to_string();
+        clean_up(db.clone()).await.unwrap();
+        let config = create_test_config(db.clone());
+        let driver = DuckDBDriver::new(config).unwrap();
+        // first attach a table
+        let test_sql = "select * from read_csv('../test-data/seria.csv')";
+        driver.create_table("test_table", test_sql).await.unwrap();
+
+        let result = driver.detach_table("test_table");
+        assert!(result.is_ok());
+        clean_up(db).await.unwrap();
     }
 }

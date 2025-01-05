@@ -18,6 +18,8 @@ pub trait OlapDriver: Send + Sync + 'static {
     async fn query(&self, sql: &str) -> Result<Vec<HashMap<String, Value>>>;
 
     async fn create_table(&self, table_name: &str, sql: &str) -> Result<String>;
+
+    async fn drop_table(&self, table_name: &str) -> Result<()>;
 }
 
 #[async_trait]

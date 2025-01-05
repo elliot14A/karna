@@ -25,6 +25,6 @@ pub fn routes<O: OlapDriver, S: DatasetStore>() -> Router {
             Router::new()
                 .route("/", get(details::<S>))
                 .route("/", patch(update::<S>))
-                .route("/", delete_route(delete::<S>)),
+                .route("/", delete_route(delete::<O, S>)),
         )
 }

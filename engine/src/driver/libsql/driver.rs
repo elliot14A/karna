@@ -105,7 +105,7 @@ impl LibSQLDriver {
     }
 
     pub async fn list_datasets(&self) -> Result<Vec<Dataset>> {
-        const SQL: &str = "select * from dataset;";
+        const SQL: &str = "select * from dataset order by created_at desc;";
 
         let mut stmt = self.prepare_statement(SQL).await?;
         let mut datasets = Vec::new();

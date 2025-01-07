@@ -88,9 +88,24 @@ impl DuckDBDriver {
         Ok(driver)
     }
 
-    pub fn get_connention(&self) -> Result<PooledConnection<DuckdbConnectionManager>> {
+    fn get_connention(&self) -> Result<PooledConnection<DuckdbConnectionManager>> {
         self.pool.get().context(DuckDBPoolSnafu)
     }
+
+    fn attach_table(&self, table_name: String) -> Result<()> {
+        let conn = self.get_connention()?;
+        debug!("🔗 Attaching database file");
+        let sql = format!(
+            "attach {} as {}",
+            format!("'{}/{}.db'", self.config.db_storage_path().display(), table_name),
+           table_name 
+        );
+        let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
+        stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
+        Ok(())
+    }
+
+    
 
     async fn create_table(&self, name: &str, create_sql: &str) -> Result<String> {
         debug!("📝 Creating new table: {}", name);
@@ -128,7 +143,8 @@ impl DuckDBDriver {
         debug!("🔍 Executing query: {}", sql);
         let conn = self.get_connention()?;
         let mut stmt = conn.prepare(sql).context(DuckDBPrepareStatementSnafu)?;
-        let mut rows = stmt.query([]).context(DuckDBExecutionSnafu { sql })?;
+        let result = stmt.query([]);
+        let mut rows = result.context(DuckDBExecutionSnafu { sql })?;
 
         let mut rows_data = Vec::new();
         let mut row_count = 0;

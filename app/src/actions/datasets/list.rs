@@ -7,11 +7,10 @@ use crate::{
 };
 
 pub async fn list() -> Result<Vec<Dataset>> {
-    let request = Request::get("/api/datasets")
+    let response = Request::get("/api/datasets")
         .send()
         .await
         .context(SendRequestSnafu)?;
-    let datasets = request.json().await.context(ParseResponseSnafu)?;
 
-    Ok(datasets)
+     response.json().await.context(ParseResponseSnafu)
 }

@@ -32,7 +32,7 @@ pub fn HomePage() -> impl IntoView {
             <div class="flex flex-1">
                 <div class="drawer lg:drawer-open">
                     <input id="sidebar" type="checkbox" class="drawer-toggle" />
-                    <div class="drawer-content flex flex-col items-center justify-center">
+                    <div class="drawer-content px-12 py-3">
                         <label for="sidebar">
                             {move || {
                                 match selected.get() {

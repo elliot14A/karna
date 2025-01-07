@@ -82,6 +82,22 @@ pub fn Upload(trigger: WriteSignal<i32>) -> impl IntoView {
     }
 }
 
+#[component]
+fn Skeleton() -> impl IntoView {
+    view! {
+        <li class="relative group hover:bg-base-200 rounded-btn">
+            <div class="flex items-center justify-between w-full animate-pulse">
+                <div class="flex-1">
+                    <div class="flex items-center">
+                        <div class="skeleton w-5 h-5 mr-1"></div>
+                        <div class="skeleton h-4 w-32"></div>
+                    </div>
+                </div>
+                <div class="skeleton w-4 h-4 ml-2"></div>
+            </div>
+        </li>
+    }
+}
 
 // Components
 #[component]
@@ -123,6 +139,7 @@ fn DeleteIcon() -> impl IntoView {
         </svg>
     }
 }
+
 
 #[component]
 fn DatasetItem(id: String,name: String,on_select: Callback<String>,on_delete: Callback<String>,) -> impl IntoView {
@@ -206,7 +223,7 @@ pub fn Datasets(
         <h3 class="menu-title text-lg">"Datasets"</h3>
         <ul class="min-h-16 max-h-96 overflow-y-auto">
             <Suspense fallback=move || {
-                view! { <span class="loading loading-dots loading-md"></span> }
+                view! { <Skeleton /> }
             }>
                 {move || {
                     datasets_res
@@ -237,7 +254,7 @@ pub fn Notebooks(
         <h3 class="menu-title text-lg">Notebooks</h3>
         <ul class="min-h-16 max-h-96 overflow-y-auto">
             <Suspense fallback=move || {
-                view! { <span class="loading loading-dots loading-md"></span> }
+                view! { <Skeleton /> }
             }>
                 {move || {
                     match notebooks_res.get() {

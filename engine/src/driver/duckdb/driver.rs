@@ -71,6 +71,17 @@ impl DuckDBDriver {
         Ok(())
     }
 
+    fn attach_all_tables(&self) -> Result<()> {
+        let db_storage_path = self.config.db_storage_path().display().to_string();
+        let db_files = list_db_files(db_storage_path)?;
+        info!("🔗 Attaching {} database files", db_files.len());
+        for table_name in db_files {
+            self.attach_table(table_name)?;
+        }
+        info!("✅ Successfully attached all database files");
+        Ok(())
+    }
+
     pub fn new(config: Config) -> Result<Self> {
         debug!("🔧 Creating new DuckDB driver instance");
         let dsn = config.build_dsn();
@@ -85,6 +96,7 @@ impl DuckDBDriver {
             .context(DuckDBPoolSnafu)?;
         let driver = DuckDBDriver { pool, config };
         driver.run_boot_queries()?;
+        driver.attach_all_tables()?;
         Ok(driver)
     }
 
@@ -94,7 +106,6 @@ impl DuckDBDriver {
 
     fn attach_table(&self, table_name: String) -> Result<()> {
         let conn = self.get_connention()?;
-        debug!("🔗 Attaching database file");
         let sql = format!(
             "attach {} as {}",
             format!("'{}/{}.db'", self.config.db_storage_path().display(), table_name),
@@ -239,6 +250,33 @@ impl OlapDriver for DuckDBDriver {
         Ok(())
     }
 }
+
+
+/// return a list of files in the database storage path
+/// matches all files with the .db extension except main.db file
+/// ignores .wal files
+fn list_db_files(db_storage_path: String) -> Result<Vec<String>> {
+    let mut db_files = vec![];
+    let entries = std::fs::read_dir(&db_storage_path)
+        .context(FileSystemSnafu { path: db_storage_path.clone() })?;
+        
+    for entry in entries {
+        let entry = entry.context(FileSystemSnafu { path: db_storage_path.clone() })?;
+        let path = entry.path();
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+        if file_name.ends_with(".db") && !file_name.starts_with("main") {
+            let wal_file = format!("{}.wal", file_name);
+            if !path.exists() || path.is_dir() || path.ends_with(&wal_file) {
+                continue;
+            }
+            let file_name = file_name.replace(".db", "");
+            db_files.push(file_name);
+        }
+    }
+    
+    Ok(db_files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

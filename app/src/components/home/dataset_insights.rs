@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use leptos::prelude::*;
-use leptos::{component, IntoView};
-use crate::actions::datasets::details;
+use send_wrapper::SendWrapper;
+use serde_json::Value;
+use crate::actions::{datasets::details, queries::query_dataset_with_pagination};
 
 // Component for the loading skeleton
 #[component]
@@ -43,14 +46,19 @@ pub fn Insights(
                         let size = (data.size as f64 / 1024.0) / 1024.0;
                         let size = (size * 100.0).round() / 100.0;
                         view! {
-                            <div class="flex justify-between px-2 py-4 w-full">
-                                <DatasetStats
-                                    name=data.name.clone()
-                                    row_count=data.row_count
-                                    size=size
-                                    r#type=data.r#type.clone()
-                                />
-                                <Download dataset_id=data.id.clone() />
+                            <div class="flex flex-col w-full">
+                                <div class="flex justify-between ">
+                                    <DatasetStats
+                                        name=data.name.clone()
+                                        row_count=data.row_count
+                                        size=size
+                                        r#type=data.r#type.clone()
+                                    />
+                                    <Download dataset_id=data.id.clone() />
+                                </div>
+                                <div>
+                                    <DatasetPreview dataset=data.name.clone() />
+                                </div>
                             </div>
                         }
                             .into_any()
@@ -65,7 +73,7 @@ pub fn Insights(
 #[component]
 fn DatasetStats(name: String, row_count: u64, size:f64, r#type: String) -> impl IntoView {
     view! {
-        <div class="stats shadow">
+        <div class="stats border-2 border-base-200 rounded-lg">
             <div class="stat">
                 <div class="stat-title">"Name"</div>
                 <div class="stat-value text-2xl">{name}</div>
@@ -83,8 +91,11 @@ fn DatasetStats(name: String, row_count: u64, size:f64, r#type: String) -> impl 
     }
 }
 
+
+
 #[component]
 fn Download(dataset_id: String) -> impl IntoView {
+    let _ = dataset_id;
     view! {
         <button class="btn btn-secondary gap-2">
             <svg
@@ -107,23 +118,136 @@ fn Download(dataset_id: String) -> impl IntoView {
 }
 
 #[component]
-fn DatasetPreview() -> impl IntoView {
+fn DatasetPreview(dataset: String) -> impl IntoView {
+    let dataset_id = dataset.clone();
+
+    leptos::logging::log!("dataset: {}", dataset);
     let (is_table_view, set_is_table_view) = signal(true);
+
+    let data = LocalResource::new(move || {
+        let id = dataset_id.clone();
+        async move {
+            query_dataset_with_pagination(id.as_ref(), 1, 20).await.unwrap()
+        }
+    });
+
     view! {
-        <div class="container mx-auto p-4">
-            <div class="form-control mb-4">
-                <label for="" class="label cursor-pointer justify-start gap4">
-                    <input
-                        type="checkbox"
-                        class="toggle toggle-primary"
-                        prop:checked=move || is_table_view.get()
-                        on:change=move |_| set_is_table_view.set(!is_table_view.get())
-                    />
-                    <span class="label-text">
-                        {move || if is_table_view.get() { "Table View" } else { "JSON View" }}
-                    </span>
-                </label>
-            </div>
+        <ToggleViewButtons is_table_view=is_table_view set_is_table_view=set_is_table_view />
+        <Transition fallback=move || {
+            view! { <div>"Loading Bro ..."</div> }
+        }>
+            {move || {
+                match data.get().and_then(process_data) {
+                    None => view! { <div>"No data available"</div> }.into_any(),
+                    Some((columns, row_values)) => {
+                        view! { <TableView columns=columns row_values=row_values /> }.into_any()
+                    }
+                }
+            }}
+        </Transition>
+    }
+}
+
+#[component]
+fn TableView(columns: Vec<String>, row_values: Vec<Vec<String>>) -> impl IntoView {
+    view! {
+        <div class="overflow-auto my-4">
+            <table class="table table-xs">
+                <thead>
+                    <tr>
+                        {move || {
+                            columns
+                                .iter()
+                                .map(|col| view! { <th>{col.to_owned()}</th> })
+                                .collect_view()
+                        }}
+                    </tr>
+                </thead>
+                <tbody>
+                    {row_values
+                        .iter()
+                        .map(|row_data| {
+                            view! {
+                                <tr>
+                                    {row_data
+                                        .iter()
+                                        .map(|value| view! { <td>{value.clone()}</td> })
+                                        .collect_view()}
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </tbody>
+            </table>
         </div>
     }
 }
+
+#[component]
+fn ToggleViewButtons(
+    is_table_view: ReadSignal<bool>, 
+    set_is_table_view: WriteSignal<bool>
+) -> impl IntoView {
+    let preview_class = move || {
+        if is_table_view.get() {
+            "btn btn-secondary"
+        } else {
+            "btn btn-secondary btn-outline"
+        }
+    };
+
+    let schema_class = move || {
+        if is_table_view.get() {
+            "btn btn-primary btn-outline"
+        } else {
+            "btn btn-primary"
+        }
+    };
+
+    view! {
+        <div class="flex container mx-auto mt-4 gap-2">
+            <button class=preview_class on:click=move |_| set_is_table_view.set(true)>
+                "Preview"
+            </button>
+            <button class=schema_class on:click=move |_| set_is_table_view.set(false)>
+                "Schema"
+            </button>
+        </div>
+    }
+}
+
+fn process_data(data: SendWrapper<Vec<HashMap<String, Value>>>) -> Option<(Vec<String>, Vec<Vec<String>>)> {
+    if data.is_empty() {
+        return None;
+    }
+
+    // Get columns from the first row's keys
+    let columns: Vec<String> = data.first()?
+        .keys()
+        .cloned()
+        .collect();
+
+    // Process each row's values in column order
+    let row_values: Vec<Vec<String>> = data
+        .iter()
+        .map(|row| {
+            columns.iter()
+                .map(|col| {
+                    row.get(col)
+                        .map(|v| match v {
+                            serde_json::Value::Null => "N/A".to_string(),
+                            serde_json::Value::Bool(b) => b.to_string(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Array(a) => format!("{:?}", a),
+                            serde_json::Value::Object(o) => format!("{:?}", o),
+                        })
+                        .unwrap_or_else(|| "N/A".to_string())
+                })
+                .collect()
+        })
+        .collect();
+
+    Some((columns, row_values))
+}
+

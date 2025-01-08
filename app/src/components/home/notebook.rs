@@ -1,5 +1,4 @@
 use leptos::prelude::*;
-use leptos::{component, IntoView};
 
 #[component]
 pub fn NoteBook() -> impl IntoView {

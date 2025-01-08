@@ -1,6 +1,5 @@
 use crate::common::theme::{Theme, ThemeSwitcher};
 use leptos::prelude::*;
-use leptos::{component, view, IntoView};
 
 #[component]
 pub fn Navbar() -> impl IntoView {

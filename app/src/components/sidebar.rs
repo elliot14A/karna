@@ -50,7 +50,7 @@ pub fn Upload(trigger: WriteSignal<i32>) -> impl IntoView {
             accept=".csv,.tsv,.parquet"
             disabled=move || is_uploading.get()
         />
-        <label for="upload" class="btn btn-secondary mb-6">
+        <label for="upload" class="btn btn-secondary mb-6 no-animation">
             <div class="flex gap-x-2 items-center justify-center">
                 {move || {
                     if is_uploading.get() {

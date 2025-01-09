@@ -20,10 +20,18 @@ pub async fn query_dataset_with_pagination(dataset: &str, page: u16, limit: u16)
         .await
         .context(SendRequestSnafu)?;
 
-    let data = response.json().await.context(ParseResponseSnafu)?;
+    Ok(response.json().await.context(ParseResponseSnafu)?)
+}
 
-    leptos::logging::log!("data: {:?}", data);
+pub async fn query_dataset_schema(dataset: &str) -> Result<Vec<HashMap<String, Value>>> {
+    let sql = format!("desc {}", dataset);
 
+    let response = Request::post("/api/query/sql")
+        .json(&serde_json::json!({ "query": sql }))
+        .context(SendRequestSnafu)?
+        .send()
+        .await
+        .context(SendRequestSnafu)?;
 
-    Ok(data)
+    Ok(response.json().await.context(ParseResponseSnafu)?)
 }

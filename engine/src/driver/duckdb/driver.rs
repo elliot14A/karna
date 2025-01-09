@@ -191,11 +191,10 @@ impl DuckDBDriver {
         debug!("🔧 Generating select query for table: {}", table_name);
         let sql = format!(
             r#"
-			select column_name as name
-			from information_schema.columns
-			where table_catalog = '{}' and table_name = 'default'
-			order by name asc
-        "#,
+			    select column_name as name
+			    from information_schema.columns
+			    where table_catalog = '{}' and table_name = 'default';
+			"#,
             table_name
         );
 

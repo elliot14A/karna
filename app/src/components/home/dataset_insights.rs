@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use leptos::prelude::*;
 use send_wrapper::SendWrapper;
 use serde_json::Value;
-use crate::actions::{datasets::details, queries::query_dataset_with_pagination};
+use crate::actions::{datasets::details, queries::{query_dataset_schema, query_dataset_with_pagination}};
 
 // Component for the loading skeleton
 #[component]
@@ -119,41 +119,78 @@ fn Download(dataset_id: String) -> impl IntoView {
 
 #[component]
 fn DatasetPreview(dataset: String) -> impl IntoView {
-    let dataset_id = dataset.clone();
-
-    leptos::logging::log!("dataset: {}", dataset);
     let (is_table_view, set_is_table_view) = signal(true);
+    let (ordered_columns, set_ordered_columns) = signal(vec![]);
+    let schema_id = dataset.clone();
 
-    let data = LocalResource::new(move || {
-        let id = dataset_id.clone();
+    let table_data = LocalResource::new(move || {
+        let id = dataset.clone();
         async move {
             query_dataset_with_pagination(id.as_ref(), 1, 20).await.unwrap()
         }
     });
 
+    let extract_column_order = move |schema_data: Vec<HashMap<String, Value>>| {
+        schema_data.iter()
+            .map(|row| {
+                row.get("column_name")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+            .flatten()
+            .collect::<Vec<String>>()
+    };
+
+    let schema_data = LocalResource::new(move || {
+        let id = schema_id.clone();
+        async move {
+            let data = query_dataset_schema(id.as_ref()).await.unwrap();
+            set_ordered_columns.set(extract_column_order(data.clone()));
+            data
+        }
+    });
+
+    let loading_view = move || view! { <div>"Loading..."</div> };
+
+    let render_table_view = move |(columns, row_values)| {
+        view! { <TableView columns=columns row_values=row_values /> }
+    };
+
+
+    let data_view = move |resource: LocalResource<_>, is_schema: bool| {
+        let ordered_columns = if !is_schema { Some(ordered_columns.get()) } else { None };
+        match resource.get().and_then(|d| process_data(d, ordered_columns)) {
+            None => view! { <div>"No data available"</div> }.into_any(),
+            Some(data) => render_table_view(data).into_any()
+        }
+    };
+
     view! {
         <ToggleViewButtons is_table_view=is_table_view set_is_table_view=set_is_table_view />
-        <Transition fallback=move || {
-            view! { <div>"Loading Bro ..."</div> }
-        }>
+        <div class="mt-4 flex w-full h-full">
             {move || {
-                match data.get().and_then(process_data) {
-                    None => view! { <div>"No data available"</div> }.into_any(),
-                    Some((columns, row_values)) => {
-                        view! { <TableView columns=columns row_values=row_values /> }.into_any()
-                    }
+                let (resource, is_schema) = if is_table_view.get() {
+                    (table_data, false)
+                } else {
+                    (schema_data, true)
+                };
+                view! {
+                    <Transition fallback=loading_view>
+                        {move || data_view(resource, is_schema)}
+                    </Transition>
                 }
+                    .into_any()
             }}
-        </Transition>
+        </div>
     }
 }
 
 #[component]
 fn TableView(columns: Vec<String>, row_values: Vec<Vec<String>>) -> impl IntoView {
     view! {
-        <div class="overflow-auto my-4">
+        <div class="overflow-auto h-[40rem] w-full">
             <table class="table table-xs">
-                <thead>
+                <thead class="sticky top-0 bg-base-100">
                     <tr>
                         {move || {
                             columns
@@ -216,16 +253,21 @@ fn ToggleViewButtons(
     }
 }
 
-fn process_data(data: SendWrapper<Vec<HashMap<String, Value>>>) -> Option<(Vec<String>, Vec<Vec<String>>)> {
+fn process_data(data: SendWrapper<Vec<HashMap<String, Value>>>, ordered_columns: Option<Vec<String>>) -> Option<(Vec<String>, Vec<Vec<String>>)> {
     if data.is_empty() {
         return None;
     }
 
     // Get columns from the first row's keys
-    let columns: Vec<String> = data.first()?
-        .keys()
-        .cloned()
-        .collect();
+       let columns: Vec<String> = ordered_columns.unwrap_or_else(|| {
+            let mut data: Vec<String> = data.first()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+            data.sort();
+            data
+        });
 
     // Process each row's values in column order
     let row_values: Vec<Vec<String>> = data

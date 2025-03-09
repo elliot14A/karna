@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-duckdb = { version = "1.1.1", features = ["bundled", "r2d2"] }
+duckdb = { version = "1.2.0", features = ["bundled", "r2d2"] }
 uuid = { version = "1.10.0", features = ["serde"] }
 base64 = "0.22"
 num_cpus = "1"

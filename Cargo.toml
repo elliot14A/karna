@@ -15,11 +15,11 @@ lto = false
 debug = true
 
 [workspace.dependencies]
-leptos = "0.7.2"
-leptos_meta = "0.7.2"
-leptos_router = "0.7.2"
-leptos_axum = "0.7.2"
-axum = { version = "0.7", features = ["multipart", "macros"] }
+leptos = "0.7.7"
+leptos_meta = "0.7.7"
+leptos_router = "0.7.7"
+leptos_axum = "0.7.7"
+axum = { version = "=0.7", features = ["multipart", "macros"] }
 cfg-if = "1"
 console_error_panic_hook = "0.1.7"
 console_log = "1"

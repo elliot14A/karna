@@ -17,6 +17,10 @@ pkgs.mkShell {
     wasm-pack
     cargo-watch
     cargo-generate
+    cmake
+    gcc
+    libcxx
+    duckdb
   ];
 
 
@@ -25,6 +29,7 @@ pkgs.mkShell {
     export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
       pkgs.openssl
+      pkgs.duckdb
     ]}"
     
     echo "Karna development environment loaded"

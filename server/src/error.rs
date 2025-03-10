@@ -113,6 +113,9 @@ impl From<engine::error::Error> for Error {
             engine::error::Error::DuckDBPool { source } => Self::Internal {
                 message: format!("failed to get duckdb connection from pool, error: {source}"),
             },
+            _ => Self::Internal {
+                message: "internal error".to_string(),
+            },
         }
     }
 }

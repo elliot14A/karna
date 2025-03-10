@@ -21,12 +21,16 @@ pkgs.mkShell {
     gcc
     libcxx
     duckdb
+    sqlx-cli
+    litecli
+    tokei
   ];
 
 
   shellHook = ''
     export RUST_BACKTRACE=1
     export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
+    export DATABASE_URL="sqlite:./karna/sqlite/db.sqlite"
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
       pkgs.openssl
       pkgs.duckdb

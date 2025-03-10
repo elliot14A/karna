@@ -52,6 +52,21 @@ pub enum Error {
 
     #[snafu(display("Failed to prepare libsql statement '{sql}' : {source}"))]
     LibSQLPrepareStatement { source: libsql::Error, sql: String },
+
+    #[snafu(display("Failed to connect to SQLx database: {source}"))]
+    SqlxConnection { source: sqlx::Error },
+
+    #[snafu(display("Failed to execute SQLx query: {sql}: {source}"))]
+    SqlxExecute { sql: String, source: sqlx::Error },
+
+    #[snafu(display("Failed to query using SQLx: {sql}: {source}"))]
+    SqlxQuery { sql: String, source: sqlx::Error },
+
+    #[snafu(display("Migration directory not found: {path}"))]
+    MigrationDirNotFound { path: String },
+
+    #[snafu(display("Failed to run SQLx migrations: {source}"))]
+    SqlxMigration { source: sqlx::migrate::MigrateError },
 }
 
 /// Result type alias for database operations.

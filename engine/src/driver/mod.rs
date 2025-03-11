@@ -1,5 +1,4 @@
 pub mod duckdb;
-pub mod libsql;
 pub mod sqlx;
 
 use std::collections::HashMap;

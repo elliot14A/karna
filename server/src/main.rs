@@ -9,7 +9,7 @@ use axum::{extract::DefaultBodyLimit, Extension, Router};
 use engine::{
     driver::{
         duckdb::{config::Config, driver::DuckDBDriver},
-        libsql::driver::LibSQLDriver,
+        sqlx::driver::SqlxDriver,
     },
     sources::file_system::FileSystem,
 };
@@ -61,12 +61,13 @@ async fn main() {
     let duckdb = duckdb_res.unwrap();
 
     // Initialize the libsql driver
-    let path = "./karna/data/karna.db";
-    let libsql_res = LibSQLDriver::new(path).await;
-    if libsql_res.is_err() {
-        panic!("Failed to create libsql driver: {:?}", libsql_res.err());
+    let path = "karna/sqlite/db.sqlite";
+    let migration_path = "./migrations";
+    let conn = SqlxDriver::new(path, migration_path).await;
+    if conn.is_err() {
+        panic!("Failed to create libsql driver: {:?}", conn.err());
     }
-    let libsql = libsql_res.unwrap();
+    let libsql = conn.unwrap();
 
     // Initialize file system source
     let file_system = FileSystem::new();

@@ -90,26 +90,6 @@ impl From<engine::error::Error> for Error {
 
             engine::error::Error::Config { .. } => unreachable!(),
 
-            engine::error::Error::LibSQLConnection { source } => Self::Internal {
-                message: format!("failed to connect to libsql, error: {source}"),
-            },
-
-            engine::error::Error::LibSQLExecute { source, sql } => Self::Internal {
-                message: format!("failed to execute sql '{sql}', error: {source}"),
-            },
-
-            engine::error::Error::LibSQLNextRow { source } => Self::Internal {
-                message: format!("failed to get next row, error: {source}"),
-            },
-
-            engine::error::Error::LibSQLConverstion { message } => Self::Internal {
-                message: format!("failed to convert value, error: {message}"),
-            },
-
-            engine::error::Error::LibSQLPrepareStatement { source, sql } => Self::BadReq {
-                message: format!("prepare statement error: {source}, sql: {sql}"),
-            },
-
             engine::error::Error::DuckDBPool { source } => Self::Internal {
                 message: format!("failed to get duckdb connection from pool, error: {source}"),
             },

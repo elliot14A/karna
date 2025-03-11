@@ -6,6 +6,7 @@ pub struct Dataset {
     pub id: String,
     pub name: String,
     pub file_name: String,
+    #[serde(rename = "type")]
     pub r#type: String,
     pub description: Option<String>,
     #[serde(deserialize_with = "parse_libsql_datetime")]

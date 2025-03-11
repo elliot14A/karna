@@ -38,21 +38,6 @@ pub enum Error {
     #[snafu(display("Invalid configuration: {message}"))]
     Config { message: String },
 
-    #[snafu(display("Failed to connect to libsql: {source}"))]
-    LibSQLConnection { source: libsql::Error },
-
-    #[snafu(display("Failed to execute libsql query '{sql}': {source}"))]
-    LibSQLExecute { source: libsql::Error, sql: String },
-
-    #[snafu(display("Failed to get next row from libsql: {source}"))]
-    LibSQLNextRow { source: libsql::Error },
-
-    #[snafu(display("Failed to convert libsql value: {message}"))]
-    LibSQLConverstion { message: String },
-
-    #[snafu(display("Failed to prepare libsql statement '{sql}' : {source}"))]
-    LibSQLPrepareStatement { source: libsql::Error, sql: String },
-
     #[snafu(display("Failed to connect to SQLx database: {source}"))]
     SqlxConnection { source: sqlx::Error },
 
@@ -67,6 +52,12 @@ pub enum Error {
 
     #[snafu(display("Failed to run SQLx migrations: {source}"))]
     SqlxMigration { source: sqlx::migrate::MigrateError },
+
+    #[snafu(display("Failed to convert string to datetime: {value}: {source}"))]
+    DateTimeParse {
+        source: chrono::ParseError,
+        value: String,
+    },
 }
 
 /// Result type alias for database operations.

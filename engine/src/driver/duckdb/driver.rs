@@ -6,7 +6,6 @@ use r2d2::Pool;
 use r2d2::PooledConnection;
 use serde_json::Value;
 use snafu::ResultExt;
-use tokio::fs;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
@@ -108,15 +107,17 @@ impl DuckDBDriver {
         let conn = self.get_connention()?;
         let sql = format!(
             "attach {} as {}",
-            format!("'{}/{}.db'", self.config.db_storage_path().display(), table_name),
-           table_name 
+            format!(
+                "'{}/{}.db'",
+                self.config.db_storage_path().display(),
+                table_name
+            ),
+            table_name
         );
         let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
         stmt.execute([]).context(DuckDBExecutionSnafu { sql })?;
         Ok(())
     }
-
-    
 
     async fn create_table(&self, name: &str, create_sql: &str) -> Result<String> {
         debug!("📝 Creating new table: {}", name);
@@ -244,23 +245,31 @@ impl OlapDriver for DuckDBDriver {
         // ignore the result of detach_table
         let _ = self.detach_table(table_name);
         // remove the database file
-        let path = format!("{}/{}.db", self.config.db_storage_path().display(), table_name);
-        fs::remove_file(&path).await.context(FileSystemSnafu {path})?;
+        let path = format!(
+            "{}/{}.db",
+            self.config.db_storage_path().display(),
+            table_name
+        );
+        tokio::fs::remove_file(&path)
+            .await
+            .context(FileSystemSnafu { path })?;
         Ok(())
     }
 }
-
 
 /// return a list of files in the database storage path
 /// matches all files with the .db extension except main.db file
 /// ignores .wal files
 fn list_db_files(db_storage_path: String) -> Result<Vec<String>> {
     let mut db_files = vec![];
-    let entries = std::fs::read_dir(&db_storage_path)
-        .context(FileSystemSnafu { path: db_storage_path.clone() })?;
-        
+    let entries = std::fs::read_dir(&db_storage_path).context(FileSystemSnafu {
+        path: db_storage_path.clone(),
+    })?;
+
     for entry in entries {
-        let entry = entry.context(FileSystemSnafu { path: db_storage_path.clone() })?;
+        let entry = entry.context(FileSystemSnafu {
+            path: db_storage_path.clone(),
+        })?;
         let path = entry.path();
         let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
         if file_name.ends_with(".db") && !file_name.starts_with("main") {
@@ -272,56 +281,44 @@ fn list_db_files(db_storage_path: String) -> Result<Vec<String>> {
             db_files.push(file_name);
         }
     }
-    
+
     Ok(db_files)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
     use super::*;
-    use tokio::fs;
 
     // Helper function to create a test configuration
-    fn create_test_config(name: String) -> Config {
+    fn create_test_config() -> Config {
         let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join(&name);
+        let test_id = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let test_id = format!("test_{test_id}");
+        let db_dir = temp_dir.join(&test_id);
+        std::fs::create_dir_all(&db_dir).unwrap();
+
+        let db_path = db_dir.join("main.db");
         Config::new(&db_path)
             .unwrap()
             .with_boot_query("CREATE TABLE test (id INTEGER)".to_string())
     }
 
-    async fn clean_up(name: String) -> std::io::Result<()> {
-        let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join(&name);
-        let db_dir = temp_dir.join(&name);
-
-        if db_path.exists() {
-            fs::remove_file(&db_path).await?;
-        }
-
-        if db_dir.exists() {
-            fs::remove_dir_all(&db_dir).await?;
-        }
-        Ok(())
-    }
-
     #[tokio::test]
     async fn test_driver_initialization() {
-        let db = "test1.db".to_string();
-        clean_up(db.clone()).await.unwrap();
-        let config = create_test_config(db.clone());
+        let config = create_test_config();
         let result = DuckDBDriver::new(config);
         assert!(result.is_ok());
-        clean_up(db).await.unwrap();
     }
-
 
     #[tokio::test]
     async fn test_boot_queries_execution() {
         // Test that all extensions are properly loaded
-        let db = "test2.db".to_string();
-        clean_up(db.clone()).await.unwrap();
-        let config = create_test_config(db.clone());
+        let config = create_test_config();
         let driver = DuckDBDriver::new(config).unwrap();
         let conn = driver.get_connention();
         assert!(conn.is_ok());
@@ -342,27 +339,20 @@ mod tests {
         // Test SQLite extension
         let result = conn.execute("SET sqlite_all_varchar=false", []);
         assert!(result.is_ok());
-        clean_up(db).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_create_table_and_query() {
-        let db = "test3.db".to_string();
-        clean_up("test_table.db".to_string()).await.unwrap();
-        clean_up(db.clone()).await.unwrap();
-        let config = create_test_config(db.clone());
+        let config = create_test_config();
         let driver = DuckDBDriver::new(config).unwrap();
 
         // Test simple table creation
         let test_sql = "select * from read_csv('../test-data/seria.csv')";
         let result = driver.create_table("test_table", test_sql).await;
-        assert!(result.is_ok());
+        let table_name = result.unwrap();
 
-        let result = driver.query("select * from test_table limit 1");
-        assert!(result.is_ok());
+        let result = driver.query(format!("select * from {} limit 1", table_name).as_str());
         assert_eq!(result.unwrap().len(), 1);
-        clean_up(db).await.unwrap();
-        clean_up("test_table.db".to_string()).await.unwrap();
     }
 
     #[test]
@@ -372,25 +362,21 @@ mod tests {
         let name = sanitize_to_sql_name("_testing");
         assert!(name.starts_with("testing"));
         let name = sanitize_to_sql_name("_hello!!!world_");
-        assert!(name.starts_with("hello_world")); 
+        assert!(name.starts_with("hello_world"));
 
         let long_name = format!("_{}_", "a".repeat(100));
         assert!(sanitize_to_sql_name(&long_name).len() <= 63);
     }
 
-
     #[tokio::test]
     async fn test_detach_table() {
-        let db = "test_table.db".to_string();
-        clean_up(db.clone()).await.unwrap();
-        let config = create_test_config(db.clone());
+        let config = create_test_config();
         let driver = DuckDBDriver::new(config).unwrap();
         // first attach a table
         let test_sql = "select * from read_csv('../test-data/seria.csv')";
-        driver.create_table("test_table", test_sql).await.unwrap();
+        let table_name = driver.create_table("test_table", test_sql).await.unwrap();
 
-        let result = driver.detach_table("test_table");
+        let result = driver.detach_table(table_name.as_str());
         assert!(result.is_ok());
-        clean_up(db).await.unwrap();
     }
 }

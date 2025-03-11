@@ -16,3 +16,4 @@ bun.lockb
 karna
 /**/*/*.db
 .git
+.sqlx

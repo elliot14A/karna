@@ -261,7 +261,7 @@ mod tests {
         let temp_dir = create_temp_dir()?;
         let db_path = temp_dir.join("test.db");
 
-        let migrations_path = PathBuf::from("./migrations");
+        let migrations_path = PathBuf::from("../migrations");
 
         let driver = SqlxDriver::new(&db_path, &migrations_path).await?;
 
@@ -321,9 +321,10 @@ mod tests {
     #[tokio::test]
     async fn test_sqlx_driver_missing_dataset() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = create_temp_dir()?;
-        let db_path = temp_dir.join("test.db");
+        let db_name = format!("test_{}.db", chrono::Utc::now().timestamp());
+        let db_path = temp_dir.join(db_name);
 
-        let migrations_path = PathBuf::from("./migrations");
+        let migrations_path = PathBuf::from("../migrations");
 
         let driver = SqlxDriver::new(&db_path, &migrations_path).await?;
 
@@ -350,7 +351,7 @@ mod tests {
         let temp_dir = create_temp_dir()?;
         let db_path = temp_dir.join("test.db");
 
-        let migrations_path = PathBuf::from("./migrations");
+        let migrations_path = PathBuf::from("../migrations");
 
         let driver = SqlxDriver::new(&db_path, &migrations_path).await?;
 

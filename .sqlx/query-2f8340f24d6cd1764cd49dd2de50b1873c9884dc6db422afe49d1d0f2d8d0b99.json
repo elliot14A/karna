@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                insert into dataset (id, name, file_name, type, description, row_count, size)\n                values (?1, ?2, ?3, ?4, ?5, ?6, ?7)\n                returning *\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "type",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "row_count",
+        "ordinal": 7,
+        "type_info": "Int64"
+      },
+      {
+        "name": "size",
+        "ordinal": 8,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2f8340f24d6cd1764cd49dd2de50b1873c9884dc6db422afe49d1d0f2d8d0b99"
+}

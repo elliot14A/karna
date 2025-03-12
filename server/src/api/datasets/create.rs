@@ -11,7 +11,12 @@ use engine::{
     sources::file_system::FileSystem,
 };
 use snafu::ResultExt;
-use std::{collections::HashMap, os::unix::fs::MetadataExt, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::{
     fs::File,
     io::{AsyncWriteExt, BufWriter},
@@ -64,9 +69,9 @@ async fn get_multipart_field(
         Some(field) => Ok(field),
         None => {
             error!("No file found in request");
-            return Err(Error::BadReq {
-                message: format!("No file found in request"),
-            });
+            Err(Error::BadReq {
+                message: "No file found in request".to_string(),
+            })
         }
     }
 }
@@ -86,7 +91,7 @@ fn get_filename(field: &axum::extract::multipart::Field<'_>) -> Result<String> {
     }
 }
 
-fn get_file_format(filepath: &PathBuf) -> Result<String> {
+fn get_file_format(filepath: &Path) -> Result<String> {
     filepath
         .extension()
         .and_then(|ext| ext.to_str())
@@ -141,7 +146,7 @@ async fn process_file_upload<O: OlapDriver>(
 
     validate_file(&source, &filepath)?;
     let create_sql = generate_sql(&source, &filepath)?;
-    let table_name = create_table(&olap, &filename.split(".").next().unwrap(), &create_sql).await?;
+    let table_name = create_table(&olap, filename.split(".").next().unwrap(), &create_sql).await?;
     let row_count = get_row_count(&olap, &table_name).await?;
 
     info!("File processing completed - Row count: {}", row_count);

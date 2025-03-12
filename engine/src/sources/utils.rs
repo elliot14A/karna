@@ -22,7 +22,7 @@ fn generate_read_csv_statement(path: &str, params: HashMap<String, String>) -> S
         .map(|(k, v)| format!("{} = '{}'", k, v))
         .collect::<Vec<String>>()
         .join(", ");
-    return format!("read_csv('{}', {})", path, query_params);
+    format!("read_csv('{}', {})", path, query_params)
 }
 
 fn generate_read_parquet_statement(path: &str, params: HashMap<String, String>) -> String {
@@ -31,7 +31,7 @@ fn generate_read_parquet_statement(path: &str, params: HashMap<String, String>) 
         .map(|(k, v)| format!("{} = '{}'", k, v))
         .collect::<Vec<String>>()
         .join(", ");
-    return format!("read_parquet('{}', {})", path, query_params);
+    format!("read_parquet('{}', {})", path, query_params)
 }
 
 fn generate_read_json_statement(path: &str, params: HashMap<String, String>) -> String {
@@ -40,5 +40,5 @@ fn generate_read_json_statement(path: &str, params: HashMap<String, String>) -> 
         .map(|(k, v)| format!("{} = '{}'", k, v))
         .collect::<Vec<String>>()
         .join(", ");
-    return format!("read_json('{}', {})", path, query_params);
+    format!("read_json('{}', {})", path, query_params)
 }

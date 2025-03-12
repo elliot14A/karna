@@ -19,7 +19,7 @@ pub enum Error {
     BadReq { message: String },
 
     #[snafu(display("Failed operation on file message: {message}, error: {source}"))]
-    FileError {
+    File {
         source: std::io::Error,
         message: String,
     },
@@ -41,11 +41,11 @@ impl IntoResponse for Error {
             Self::NotFound { message } => (StatusCode::NOT_FOUND, message),
             Self::MultiPart { source } => (
                 StatusCode::BAD_REQUEST,
-                format!("Failed to read multipart: {}", source.to_string()),
+                format!("Failed to read multipart: {}", source),
             ),
             Self::Internal { message } => (StatusCode::INTERNAL_SERVER_ERROR, message),
             Self::BadReq { message } => (StatusCode::BAD_REQUEST, message),
-            Self::FileError { message, .. } => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            Self::File { message, .. } => (StatusCode::INTERNAL_SERVER_ERROR, message),
         };
 
         let error_message = ErrorMessage { message };

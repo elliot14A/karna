@@ -57,10 +57,11 @@ impl ThemeSwitcher {
         let theme = Signal::derive(move || {
             // Check user's system preference for dark mode
             // Default to Retro theme if system preference is not available
-            let preference = use_preferred_dark()
-                .get_untracked()
-                .then(|| Theme::Dark)
-                .unwrap_or(Theme::Retro);
+            let preference = if use_preferred_dark().get_untracked() {
+                Theme::Dark
+            } else {
+                Theme::Retro
+            };
 
             // Use cookie value if exists, otherwise fall back to system preference
             cookie.0.get().unwrap_or(preference)

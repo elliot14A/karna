@@ -1,15 +1,20 @@
-use crate::{actions::datasets::{upload_file_system, delete as delete_dataset}, common::models::Dataset};
+use crate::pages::home::Selected;
+use crate::{
+    actions::datasets::{delete as delete_dataset, upload_file_system},
+    common::models::Dataset,
+};
 use leptos::{prelude::*, task::spawn_local};
 use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 use web_sys::{Event, HtmlInputElement};
-use crate::pages::home::Selected;
 
 #[component]
-pub fn Sidebar(datasets_res: LocalResource<Vec<Dataset>>, trigger: WriteSignal<i32>, selected: WriteSignal<Selected>) -> impl IntoView {
-    let notebook_res = LocalResource::new(|| async move {
-                        vec!["Notebook 1".to_owned()]
-                    });
+pub fn Sidebar(
+    datasets_res: LocalResource<Vec<Dataset>>,
+    trigger: WriteSignal<i32>,
+    selected: WriteSignal<Selected>,
+) -> impl IntoView {
+    let notebook_res = LocalResource::new(|| async move { vec!["Notebook 1".to_owned()] });
     view! {
         <>
             <label for="sidebar" class="drawer-overlay"></label>
@@ -140,9 +145,13 @@ fn DeleteIcon() -> impl IntoView {
     }
 }
 
-
 #[component]
-fn DatasetItem(id: String,name: String,on_select: Callback<String>,on_delete: Callback<String>,) -> impl IntoView {
+fn DatasetItem(
+    id: String,
+    name: String,
+    on_select: Callback<String>,
+    on_delete: Callback<String>,
+) -> impl IntoView {
     let select_id = id.clone();
     let delete_id = id.clone();
 
@@ -187,8 +196,8 @@ pub fn DatasetsList(
                     <DatasetItem
                         id=dataset.id.clone()
                         name=dataset.name.clone()
-                        on_select=on_select.clone()
-                        on_delete=on_delete.clone()
+                        on_select=on_select
+                        on_delete=on_delete
                     />
                 }
             })
@@ -201,7 +210,7 @@ pub fn DatasetsList(
 pub fn Datasets(
     datasets_res: LocalResource<Vec<Dataset>>,
     trigger: WriteSignal<i32>,
-    selected: WriteSignal<Selected>
+    selected: WriteSignal<Selected>,
 ) -> impl IntoView {
     let delete_action = Action::new(move |dataset_id: &String| {
         let dataset_id = dataset_id.to_owned();
@@ -232,8 +241,8 @@ pub fn Datasets(
                             view! {
                                 <DatasetsList
                                     datasets=datasets
-                                    on_select=on_select.clone()
-                                    on_delete=on_delete.clone()
+                                    on_select=on_select
+                                    on_delete=on_delete
                                 />
                             }
                                 .into_any()
@@ -245,11 +254,8 @@ pub fn Datasets(
     }
 }
 
-
 #[component]
-pub fn Notebooks(
-    notebooks_res: LocalResource<Vec<String>>,
-) -> impl IntoView {
+pub fn Notebooks(notebooks_res: LocalResource<Vec<String>>) -> impl IntoView {
     view! {
         <h3 class="menu-title text-lg">Notebooks</h3>
         <ul class="min-h-16 max-h-96 overflow-y-auto">

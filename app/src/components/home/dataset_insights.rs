@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
+use crate::actions::{
+    datasets::details,
+    queries::{query_dataset_schema, query_dataset_with_pagination},
+};
 use leptos::prelude::*;
 use send_wrapper::SendWrapper;
 use serde_json::Value;
-use crate::actions::{datasets::details, queries::{query_dataset_schema, query_dataset_with_pagination}};
 
 // Component for the loading skeleton
 #[component]
@@ -27,15 +30,11 @@ fn LoadingSkeleton() -> impl IntoView {
 }
 
 #[component]
-pub fn Insights(
-    #[prop(into)] dataset_id: String,
-) -> impl IntoView {
+pub fn Insights(#[prop(into)] dataset_id: String) -> impl IntoView {
     let id = dataset_id.clone();
     let dataset = LocalResource::new(move || {
-        let id = id.clone(); 
-        async move {
-            details(&id).await.unwrap()     
-        }
+        let id = id.clone();
+        async move { details(&id).await.unwrap() }
     });
 
     view! {
@@ -71,7 +70,7 @@ pub fn Insights(
 }
 
 #[component]
-fn DatasetStats(name: String, row_count: u64, size:f64, r#type: String) -> impl IntoView {
+fn DatasetStats(name: String, row_count: u64, size: f64, r#type: String) -> impl IntoView {
     view! {
         <div class="stats border-2 border-base-200 rounded-lg">
             <div class="stat">
@@ -90,8 +89,6 @@ fn DatasetStats(name: String, row_count: u64, size:f64, r#type: String) -> impl 
         </div>
     }
 }
-
-
 
 #[component]
 fn Download(dataset_id: String) -> impl IntoView {
@@ -126,18 +123,20 @@ fn DatasetPreview(dataset: String) -> impl IntoView {
     let table_data = LocalResource::new(move || {
         let id = dataset.clone();
         async move {
-            query_dataset_with_pagination(id.as_ref(), 1, 20).await.unwrap()
+            query_dataset_with_pagination(id.as_ref(), 1, 20)
+                .await
+                .unwrap()
         }
     });
 
     let extract_column_order = move |schema_data: Vec<HashMap<String, Value>>| {
-        schema_data.iter()
-            .map(|row| {
+        schema_data
+            .iter()
+            .filter_map(|row| {
                 row.get("column_name")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string())
             })
-            .flatten()
             .collect::<Vec<String>>()
     };
 
@@ -156,12 +155,18 @@ fn DatasetPreview(dataset: String) -> impl IntoView {
         view! { <TableView columns=columns row_values=row_values /> }
     };
 
-
     let data_view = move |resource: LocalResource<_>, is_schema: bool| {
-        let ordered_columns = if !is_schema { Some(ordered_columns.get()) } else { None };
-        match resource.get().and_then(|d| process_data(d, ordered_columns)) {
+        let ordered_columns = if !is_schema {
+            Some(ordered_columns.get())
+        } else {
+            None
+        };
+        match resource
+            .get()
+            .and_then(|d| process_data(d, ordered_columns))
+        {
             None => view! { <div>"No data available"</div> }.into_any(),
-            Some(data) => render_table_view(data).into_any()
+            Some(data) => render_table_view(data).into_any(),
         }
     };
 
@@ -222,8 +227,8 @@ fn TableView(columns: Vec<String>, row_values: Vec<Vec<String>>) -> impl IntoVie
 
 #[component]
 fn ToggleViewButtons(
-    is_table_view: ReadSignal<bool>, 
-    set_is_table_view: WriteSignal<bool>
+    is_table_view: ReadSignal<bool>,
+    set_is_table_view: WriteSignal<bool>,
 ) -> impl IntoView {
     let preview_class = move || {
         if is_table_view.get() {
@@ -253,27 +258,27 @@ fn ToggleViewButtons(
     }
 }
 
-fn process_data(data: SendWrapper<Vec<HashMap<String, Value>>>, ordered_columns: Option<Vec<String>>) -> Option<(Vec<String>, Vec<Vec<String>>)> {
+fn process_data(
+    data: SendWrapper<Vec<HashMap<String, Value>>>,
+    ordered_columns: Option<Vec<String>>,
+) -> Option<(Vec<String>, Vec<Vec<String>>)> {
     if data.is_empty() {
         return None;
     }
 
     // Get columns from the first row's keys
-       let columns: Vec<String> = ordered_columns.unwrap_or_else(|| {
-            let mut data: Vec<String> = data.first()
-                .unwrap()
-                .keys()
-                .cloned()
-                .collect();
-            data.sort();
-            data
-        });
+    let columns: Vec<String> = ordered_columns.unwrap_or_else(|| {
+        let mut data: Vec<String> = data.first().unwrap().keys().cloned().collect();
+        data.sort();
+        data
+    });
 
     // Process each row's values in column order
     let row_values: Vec<Vec<String>> = data
         .iter()
         .map(|row| {
-            columns.iter()
+            columns
+                .iter()
                 .map(|col| {
                     row.get(col)
                         .map(|v| match v {
@@ -292,4 +297,3 @@ fn process_data(data: SendWrapper<Vec<HashMap<String, Value>>>, ordered_columns:
 
     Some((columns, row_values))
 }
-

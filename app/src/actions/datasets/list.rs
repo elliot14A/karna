@@ -12,5 +12,5 @@ pub async fn list() -> Result<Vec<Dataset>> {
         .await
         .context(SendRequestSnafu)?;
 
-     response.json().await.context(ParseResponseSnafu)
+    response.json().await.context(ParseResponseSnafu)
 }

@@ -106,12 +106,9 @@ impl DuckDBDriver {
     fn attach_table(&self, table_name: String) -> Result<()> {
         let conn = self.get_connention()?;
         let sql = format!(
-            "attach {} as {}",
-            format!(
-                "'{}/{}.db'",
-                self.config.db_storage_path().display(),
-                table_name
-            ),
+            "attach '{}/{}.db' as {}",
+            self.config.db_storage_path().display(),
+            table_name,
             table_name
         );
         let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
@@ -126,8 +123,9 @@ impl DuckDBDriver {
 
         debug!("🔗 Attaching database file");
         let sql = format!(
-            "attach {} as {}",
-            format!("'{}/{}.db'", self.config.db_storage_path().display(), name),
+            "attach '{}/{}.db' as {}",
+            self.config.db_storage_path().display(),
+            name,
             name
         );
         let mut stmt = conn.prepare(&sql).context(DuckDBPrepareStatementSnafu)?;
@@ -161,7 +159,7 @@ impl DuckDBDriver {
         let mut rows_data = Vec::new();
         let mut row_count = 0;
         while let Some(row) = rows.next().context(DuckDBNextRowSnafu)? {
-            let values = duckdb_row_to_json(&row)?;
+            let values = duckdb_row_to_json(row)?;
             rows_data.push(values);
             row_count += 1;
         }
@@ -178,7 +176,7 @@ impl DuckDBDriver {
             .map(|values| {
                 column_names
                     .iter()
-                    .zip(values.into_iter())
+                    .zip(values)
                     .map(|(name, value)| (name.clone(), value))
                     .collect()
             })
@@ -209,11 +207,11 @@ impl DuckDBDriver {
         }
 
         debug!("✨ Generated select query with {} columns", columns.len());
-        return Ok(format!(
+        Ok(format!(
             "select {} from {}.default",
             columns.join(", "),
             table_name
-        ));
+        ))
     }
 
     fn detach_table(&self, table_name: &str) -> Result<()> {

@@ -32,6 +32,7 @@ pkgs.mkShell {
     export RUST_BACKTRACE=1
     export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
     export DATABASE_URL="sqlite://karna/sqlite/db.sqlite"
+    export SQLX_OFFLINE=true
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
       pkgs.openssl
       pkgs.duckdb

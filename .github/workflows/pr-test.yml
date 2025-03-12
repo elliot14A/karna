@@ -22,16 +22,6 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: Verify SQLx metadata
-        run: |
-          if [ -d ".sqlx" ]; then
-            echo "Found .sqlx directory, will use SQLx offline mode"
-            ls -la .sqlx
-          else
-            echo "Warning: .sqlx directory not found. Run queries locally and commit the .sqlx directory."
-            echo "::warning::.sqlx directory not found. SQLx query checking may fail."
-          fi
-
       - name: Nix cache
         uses: actions/cache@v3
         with:

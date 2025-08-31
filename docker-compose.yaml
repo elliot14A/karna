@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: karna-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - .volumes/postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=karna
+      - POSTGRES_PASSWORD=karna
+      - POSTGRES_DB=karna_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U karna -d karna_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - karna
+
+  minio:
+    image: minio/minio
+    container_name: karna-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - .volumes/minio/data:/export
+      - .volumes/minio/config:/root/.minio
+    environment:
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    networks:
+      - karna
+    command: server -console-address :9002 /export
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  karna:

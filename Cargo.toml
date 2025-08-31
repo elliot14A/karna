@@ -1,0 +1,13 @@
+[package]
+name = "karna"
+version = "0.1.0"
+edition = "2024"
+authors = ["Akshith Madhur"]
+
+[[bin]]
+name = "karna"
+path = "./karna-cli/src/main.rs"
+
+[workspace]
+resolver = "2"
+members = ["karna-cli", "karna-core", "karna-db", "karna-server"]
